@@ -1,0 +1,42 @@
+[
+  {
+    "_id": "delitas_Dz5Qywg4nkdLc5a1Zhce_2026-10-24",
+    "deliveredCount": 6,
+    "arrivedAtPlantAt": "2026-10-24T23:35:21.054Z",
+    "statusLabel": "En planta - Vehículo guardado (Jornada finalizada totalmente)",
+    "driverId": "Dz5Qywg4nkdLc5a1Zhce",
+    "finishedAt": "2026-10-24T23:35:01.466Z",
+    "reopenedAt": "2026-10-24T23:27:51.945Z",
+    "date": "2026-10-24",
+    "arrivalNotes": "",
+    "status": "arrived_at_plant",
+    "totalDeliveries": 6,
+    "companyId": "delitas",
+    "pendingCount": 0,
+    "updatedAt": "2026-10-24T23:35:22.280Z",
+    "notes": "",
+    "failedCount": 0,
+    "driverName": "Cristian Alvarez"
+  },
+  {
+    "_id": "delitas_Dz5Qywg4nkdLc5a1Zhce_2026-10-25",
+    "driverId": "Dz5Qywg4nkdLc5a1Zhce",
+    "date": "2026-10-25",
+    "pendingCount": 0,
+    "arrivedAtPlantAt": "2026-10-25T17:00:20.432Z",
+    "driverName": "Cristian Alvarez",
+    "deliveredCount": 3,
+    "startNotes": "",
+    "notes": "Todo OK",
+    "statusLabel": "En ruta",
+    "startedAt": "2026-10-25T14:19:12.386Z",
+    "failedCount": 0,
+    "finishedAt": "2026-10-25T15:27:19.290Z",
+    "reopenedAt": "2026-10-25T23:09:37.869Z",
+    "updatedAt": "2026-10-25T23:09:39.669Z",
+    "totalDeliveries": 3,
+    "companyId": "delitas",
+    "status": "active",
+    "arrivalNotes": "Todo OK"
+  }
+]

@@ -1,0 +1,32 @@
+[
+  {
+    "_id": "1RNxexH6y1gdWWu85TuP",
+    "updatedAt": "2026-10-19T02:43:22.986Z",
+    "phone": "3157205221",
+    "companyId": "delitas",
+    "active": true,
+    "createdAt": "2026-10-19T01:39:37.167Z",
+    "name": "Kennet Gallego",
+    "password": "123456",
+    "vehicle": "VGA423"
+  },
+  {
+    "_id": "Dz5Qywg4nkdLc5a1Zhce",
+    "phone": "3165443285",
+    "arrivalNotes": "Todo OK",
+    "name": "Cristian Alvarez",
+    "active": true,
+    "shiftStatus": "active",
+    "shiftDate": "2026-10-25",
+    "companyId": "delitas",
+    "arrivedAtPlantAt": "2026-10-25T17:00:20.432Z",
+    "updatedAt": "2026-10-25T23:09:39.669Z",
+    "shiftEndedAt": "2026-10-25T15:27:19.290Z",
+    "password": "040612",
+    "shiftStartedAt": "2026-10-25T14:19:12.386Z",
+    "shiftStartNotes": "",
+    "shiftNotes": "Todo OK",
+    "createdAt": "2026-10-19T01:39:52.849Z",
+    "vehicle": "AMR071"
+  }
+]

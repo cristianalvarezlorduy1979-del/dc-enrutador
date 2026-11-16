@@ -1,0 +1,170 @@
+{
+  "clients": [
+    {
+      "id": "c_1792369964788_dsc5",
+      "fullName": "Cristian Alvarez",
+      "companyName": "Restaurante Diana's",
+      "phone": "3165443285",
+      "address": "Cra 10 # 15 - 32 Villa gorgona",
+      "city": "Villa Gorgona",
+      "notes": "",
+      "createdAt": "2026-10-19T00:32:44.788Z"
+    },
+    {
+      "id": "c1",
+      "fullName": "Carlos Alberto Rodríguez",
+      "companyName": "Ferretería El Progreso",
+      "phone": "+57 310 456 7890",
+      "address": "Carrera 7 # 32-16",
+      "city": "Bogotá",
+      "notes": "Recepción en el 2do piso. Preguntar por doña Marta.",
+      "createdAt": "2026-10-18T18:00:00.000Z"
+    },
+    {
+      "id": "c2",
+      "fullName": "María Fernanda Gómez",
+      "companyName": "Distribuidora Nova S.A.S.",
+      "phone": "+57 315 889 0123",
+      "address": "Calle 100 # 19-61",
+      "city": "Bogotá",
+      "notes": "Entrada por el sótano para cargue y descargue.",
+      "createdAt": "2026-10-18T18:05:00.000Z"
+    },
+    {
+      "id": "c3",
+      "fullName": "Andrés Felipe Martínez",
+      "companyName": "Tecnología & Redes del Norte",
+      "phone": "+57 320 112 3344",
+      "address": "Avenida El Dorado # 68C-61",
+      "city": "Bogotá",
+      "notes": "Llamar 10 minutos antes de llegar a la portería.",
+      "createdAt": "2026-10-18T18:10:00.000Z"
+    },
+    {
+      "id": "c4",
+      "fullName": "Diana Marcela Castro",
+      "companyName": "Restaurante Sabor Criollo",
+      "phone": "+57 301 776 5432",
+      "address": "Calle 45 # 13-22",
+      "city": "Bogotá",
+      "notes": "Horario de entrega: antes de las 11:30 AM.",
+      "createdAt": "2026-10-18T18:15:00.000Z"
+    },
+    {
+      "id": "c5",
+      "fullName": "Jorge Eliécer Morales",
+      "companyName": "Almacenes La 80",
+      "phone": "+57 318 901 2345",
+      "address": "Calle 80 # 69-45",
+      "city": "Bogotá",
+      "notes": "Portón metálico azul, timbre 101.",
+      "createdAt": "2026-10-18T18:20:00.000Z"
+    }
+  ],
+  "drivers": [
+    {
+      "id": "d1",
+      "name": "Juan Pablo Pérez",
+      "phone": "+57 300 123 4567",
+      "vehicle": "Camión FTR - Placa WXQ-452",
+      "active": true
+    },
+    {
+      "id": "d2",
+      "name": "David Camilo Rivas",
+      "phone": "+57 312 987 6543",
+      "vehicle": "Moto Boxer - Placa NKL-89D",
+      "active": true
+    }
+  ],
+  "deliveries": [
+    {
+      "id": "del-1",
+      "date": "2026-10-18",
+      "driverId": "d1",
+      "clientId": "c1",
+      "orderIndex": 1,
+      "status": "delivered",
+      "notes": "Entregado en recepción a Marta",
+      "deliveredAt": "2026-10-18T18:45:00.000Z"
+    },
+    {
+      "id": "del-2",
+      "date": "2026-10-18",
+      "driverId": "d1",
+      "clientId": "c2",
+      "orderIndex": 2,
+      "status": "in_transit",
+      "notes": "",
+      "deliveredAt": null
+    },
+    {
+      "id": "del-3",
+      "date": "2026-10-18",
+      "driverId": "d1",
+      "clientId": "c3",
+      "orderIndex": 3,
+      "status": "pending",
+      "notes": "",
+      "deliveredAt": null
+    },
+    {
+      "id": "del-4",
+      "date": "2026-10-18",
+      "driverId": "d2",
+      "clientId": "c4",
+      "orderIndex": 1,
+      "status": "pending",
+      "notes": "",
+      "deliveredAt": null
+    },
+    {
+      "id": "del_1792369871341_qqll",
+      "date": "2026-10-19",
+      "driverId": "d1",
+      "clientId": "c1",
+      "orderIndex": 1,
+      "status": "delivered",
+      "notes": "",
+      "deliveredAt": "2026-10-19T00:35:09.495Z",
+      "failureReason": null,
+      "createdAt": "2026-10-19T00:31:11.342Z"
+    },
+    {
+      "id": "del_1792369875322_uj4b",
+      "date": "2026-10-19",
+      "driverId": "d1",
+      "clientId": "c2",
+      "orderIndex": 2,
+      "status": "delivered",
+      "notes": "",
+      "deliveredAt": "2026-10-19T00:36:05.514Z",
+      "failureReason": null,
+      "createdAt": "2026-10-19T00:31:15.322Z"
+    },
+    {
+      "id": "del_1792369875838_nhkr",
+      "date": "2026-10-19",
+      "driverId": "d1",
+      "clientId": "c3",
+      "orderIndex": 3,
+      "status": "delivered",
+      "notes": "",
+      "deliveredAt": "2026-10-19T00:42:59.551Z",
+      "failureReason": null,
+      "createdAt": "2026-10-19T00:31:15.838Z"
+    },
+    {
+      "id": "del_1792369993016_c5qa",
+      "date": "2026-10-19",
+      "driverId": "d1",
+      "clientId": "c_1792369964788_dsc5",
+      "orderIndex": 4,
+      "status": "in_transit",
+      "notes": "",
+      "deliveredAt": null,
+      "failureReason": null,
+      "createdAt": "2026-10-19T00:33:13.016Z"
+    }
+  ]
+}

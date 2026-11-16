@@ -1,0 +1,2166 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Ruta de Conductor - Enrutador</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#101c32">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Aptos Narrow"', 'Aptos', '"Segoe UI"', '-apple-system', 'BlinkMacSystemFont', 'Roboto', 'sans-serif'],
+          }
+        }
+      }
+    };
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- Backend Provider (Netcup Node.js + MongoDB + WebSockets con Fallback a Firebase) -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/api-service.js?v=1"></script>
+  <script>
+    if (!window.ApiService) {
+      document.write('<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"><\/script>');
+      document.write('<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"><\/script>');
+      document.write('<script src="/firebase-config.js?v=33"><\/script>');
+    }
+  </script>
+
+  <style>
+    @font-face {
+      font-family: 'Aptos Narrow';
+      src: local('Aptos Narrow'), local('AptosNarrow'),
+           url('/fonts/aptos-narrow.woff2') format('woff2'),
+           url('/fonts/aptos-narrow.ttf') format('truetype');
+      font-weight: 100 900;
+      font-style: normal;
+      font-display: swap;
+    }
+    html {
+      font-size: 16px;
+    }
+    body {
+      -webkit-tap-highlight-color: transparent;
+      font-family: 'Aptos Narrow', 'Aptos', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+      font-size: 16px;
+    }
+    button, input, select, textarea {
+      font-family: inherit;
+    }
+    .status-badge-delivered { background-color: #DEF7EC; color: #03543F; border: 1px solid #BCF0DA; }
+    .status-badge-in_transit { background-color: #E1EFFE; color: #1E429F; border: 1px solid #B4C6FC; }
+    .status-badge-pending { background-color: #FEF08A; color: #854D0E; border: 1px solid #FDE047; }
+    .status-badge-failed { background-color: #FDE8E8; color: #9B1C1C; border: 1px solid #F8B4B4; }
+  </style>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans pb-24">
+
+  <!-- Cabecera Móvil -->
+  <header class="sticky top-0 z-40 bg-blue-600 text-white shadow-md px-4 py-3">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center space-x-2.5">
+        <img src="/icons/logo.jpg?v=12" alt="Logo" class="w-11 h-11 rounded-full object-cover shadow border border-white/30">
+        <div>
+          <h1 class="text-lg font-bold leading-none flex items-center gap-1.5">
+            Mi Ruta del Día
+            <span class="text-[9px] font-bold bg-blue-800/80 text-blue-200 px-1.5 py-0.5 rounded border border-blue-400/40 font-mono">v1.0</span>
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          </h1>
+          <p id="headerCompanyText" class="text-xs text-blue-200 font-medium mt-0.5 truncate max-w-[170px]">Cargando empresa...</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-2">
+        <button id="btnInstall" onclick="promptInstallPWA()" class="hidden bg-yellow-400 text-gray-900 text-xs font-bold px-2.5 py-1.5 rounded-full shadow flex items-center space-x-1 animate-pulse">
+          <i class="fa-solid fa-download"></i>
+          <span>Instalar</span>
+        </button>
+        <button onclick="changeProfile()" class="text-xs bg-blue-700 hover:bg-blue-800 px-2.5 py-1.5 rounded-lg border border-blue-500 font-medium">
+          <i class="fa-solid fa-user mr-1"></i><span id="btnProfileText">Perfil</span>
+        </button>
+        <button onclick="logoutDriver()" class="text-xs bg-blue-800/80 hover:bg-rose-600 px-2.5 py-1.5 rounded-lg border border-blue-400/40 font-medium text-blue-100 hover:text-white transition" title="Cerrar sesión / Bloquear ruta">
+          <i class="fa-solid fa-right-from-bracket"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Barra de progreso de entregas -->
+    <div id="progressBarContainer" class="mt-3 bg-blue-700/60 p-2.5 rounded-xl border border-blue-500/40">
+      <div class="flex justify-between items-center text-xs mb-1.5">
+        <span class="font-medium text-blue-100" id="headerDriverName">Conductor no seleccionado</span>
+        <span id="progressText" class="font-bold text-white">0 / 0 (0%)</span>
+      </div>
+      <div class="w-full bg-blue-900/50 rounded-full h-2.5 overflow-hidden">
+        <div id="progressBar" class="bg-emerald-400 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+      </div>
+      <div id="headerRouteStartedBanner" class="hidden mt-1.5 pt-1.5 border-t border-blue-500/30 flex items-center justify-between text-[11px]">
+        <span class="text-blue-200 flex items-center gap-1">
+          <i class="fa-solid fa-play text-emerald-400 text-[10px]"></i> Ruta iniciada:
+        </span>
+        <span id="headerRouteStartedTime" class="font-bold text-emerald-300">-</span>
+      </div>
+    </div>
+
+    <!-- Barra de Herramientas Inteligentes de Ruta -->
+    <div id="routeToolsContainer" class="mt-2.5 grid grid-cols-4 gap-1.5">
+      <button onclick="conductorSortBySchedule(event)" class="bg-blue-800/80 hover:bg-blue-800 active:scale-95 text-white py-2 px-1 rounded-xl text-[10px] font-bold border border-blue-400/40 flex flex-col items-center justify-center gap-1 shadow-sm transition" title="Ordenar por horario de entrega">
+        <i class="fa-solid fa-clock text-amber-300 text-sm"></i>
+        <span>Por Horario</span>
+      </button>
+      <button onclick="conductorSortByNeighborhood(event)" class="bg-indigo-800/80 hover:bg-indigo-800 active:scale-95 text-white py-2 px-1 rounded-xl text-[10px] font-bold border border-indigo-400/40 flex flex-col items-center justify-center gap-1 shadow-sm transition" title="Agrupar y organizar entregas por barrio">
+        <i class="fa-solid fa-map-pin text-indigo-300 text-sm"></i>
+        <span>Por Barrio</span>
+      </button>
+      <button onclick="conductorOptimizeByProximity(event)" class="bg-emerald-700/80 hover:bg-emerald-700 active:scale-95 text-white py-2 px-1 rounded-xl text-[10px] font-bold border border-emerald-400/40 flex flex-col items-center justify-center gap-1 shadow-sm transition" title="Ordenar de más cercanos a más lejanos con GPS">
+        <i class="fa-solid fa-route text-teal-300 text-sm"></i>
+        <span>Cercanos</span>
+      </button>
+      <button onclick="conductorOpenFullMaps()" class="bg-slate-900/80 hover:bg-slate-900 active:scale-95 text-white py-2 px-1 rounded-xl text-[10px] font-bold border border-slate-600/40 flex flex-col items-center justify-center gap-1 shadow-sm transition" title="Ver toda la ruta en Google Maps">
+        <i class="fa-solid fa-map-location-dot text-emerald-400 text-sm"></i>
+        <span>En Maps</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Filtro Rápido de Estado -->
+  <div id="filterBarContainer" class="px-4 py-2.5 bg-white border-b border-gray-200 flex space-x-2 overflow-x-auto shadow-sm">
+    <button onclick="setFilter('all')" id="filterAll" class="px-3 py-1 text-xs font-semibold rounded-full bg-blue-600 text-white shadow-sm whitespace-nowrap">
+      Todos (<span id="countAll">0</span>)
+    </button>
+    <button onclick="setFilter('pending')" id="filterPending" class="px-3 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 whitespace-nowrap">
+      Pendientes (<span id="countPending">0</span>)
+    </button>
+    <button onclick="setFilter('delivered')" id="filterDelivered" class="px-3 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 whitespace-nowrap">
+      Entregados (<span id="countDelivered">0</span>)
+    </button>
+  </div>
+
+  <!-- BARRA DE ACCIÓN: FINALIZAR DÍA / RETORNO A PLANTA -->
+  <div id="barFinishDayContainer" class="px-4 pt-3 pb-1">
+    <button onclick="openFinishDayModal()" class="w-full py-2.5 px-3.5 rounded-2xl bg-gradient-to-r from-blue-700 via-indigo-700 to-indigo-900 hover:from-blue-800 hover:to-indigo-950 text-white font-bold text-xs sm:text-sm shadow-md shadow-indigo-900/20 flex items-center justify-between active:scale-[0.99] transition">
+      <div class="flex items-center gap-2">
+        <span class="w-7 h-7 rounded-xl bg-white/20 flex items-center justify-center text-sm shadow-2xs">🏁</span>
+        <span>Finalizar Día y Retornar a Planta</span>
+      </div>
+      <span class="text-[11px] bg-white/20 hover:bg-white/30 px-2.5 py-1 rounded-xl font-bold flex items-center gap-1">
+        Cerrar Ruta <i class="fa-solid fa-chevron-right text-[9px]"></i>
+      </span>
+    </button>
+  </div>
+
+  <!-- Contenido: Lista de Entregas -->
+  <main class="px-4 py-3 space-y-3" id="deliveriesContainer">
+    <div class="text-center py-12 text-gray-400">
+      <i class="fa-solid fa-spinner fa-spin text-3xl mb-2 text-blue-600"></i>
+      <p>Cargando ruta de entregas...</p>
+    </div>
+  </main>
+
+  <!-- Modal para Autenticación de Empresa y Selección de Conductor -->
+  <div id="profileModal" class="hidden fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl p-5 shadow-2xl space-y-4">
+      <div class="flex justify-between items-center border-b pb-2.5">
+        <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
+          <i class="fa-solid fa-shield-halved text-blue-600"></i>
+          <span id="profileModalTitle">Acceso de Conductor</span>
+        </h3>
+        <button onclick="closeProfileModal()" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <!-- PASO 1: CONTRASEÑA DE LA EMPRESA (Oculta las demás empresas totalmente) -->
+      <div id="stepCompanyAuth" class="space-y-3.5">
+        <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 flex items-center gap-3">
+          <div class="w-11 h-11 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold text-lg shrink-0 shadow-sm">
+            <i class="fa-solid fa-building-shield"></i>
+          </div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-sm leading-tight" id="companyAuthDisplayTitle">Empresa</h4>
+            <p class="text-[11px] text-slate-500 leading-tight mt-0.5" id="companyAuthDisplaySubtitle">Digita la contraseña de tu empresa para ingresar a las rutas</p>
+          </div>
+        </div>
+
+        <div id="companyIdentifierField">
+          <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Empresa o Correo</label>
+          <input type="text" id="companyIdentifierInput" placeholder="Ej: delitas o delitas@gmail.com" value="delitas" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm font-semibold focus:border-blue-500 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Contraseña de la Empresa *</label>
+          <div class="relative">
+            <input type="password" id="companyAuthPassword" onkeydown="if(event.key==='Enter') submitCompanyAuth()" placeholder="Escribe la contraseña de la empresa..." class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm font-semibold focus:border-blue-500 focus:outline-none pr-10 font-mono">
+            <button type="button" onclick="togglePasswordVisibility('companyAuthPassword', 'eyeCompIcon')" class="absolute right-3 top-3 text-gray-400 hover:text-gray-600">
+              <i class="fa-solid fa-eye" id="eyeCompIcon"></i>
+            </button>
+          </div>
+          <p id="companyAuthError" class="hidden text-xs text-rose-600 font-bold mt-1.5 flex items-center gap-1">
+            <i class="fa-solid fa-circle-exclamation"></i> <span id="companyAuthErrorText">Contraseña incorrecta.</span>
+          </p>
+        </div>
+
+        <button type="button" id="btnSubmitCompanyAuth" onclick="submitCompanyAuth()" class="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-sm shadow flex items-center justify-center gap-2 transition">
+          <i class="fa-solid fa-key"></i> Validar Empresa
+        </button>
+
+
+      </div>
+
+      <!-- PASO 2: SELECCIONAR CONDUCTOR (Solo conductores de la empresa validada) -->
+      <div id="stepDriverSelect" class="hidden space-y-3">
+        <div class="flex items-center justify-between pb-1 border-b border-gray-100">
+          <div>
+            <span class="text-[10px] uppercase font-bold text-blue-600 tracking-wider" id="driverSelectCompanyBadge">Empresa</span>
+            <h4 class="font-bold text-gray-800 text-sm">¿Cuál es tu nombre de conductor?</h4>
+          </div>
+          <button type="button" onclick="promptChangeCompany()" class="text-[11px] text-rose-600 hover:text-rose-700 font-bold flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-rose-50 transition" title="Salir de esta empresa">
+            <i class="fa-solid fa-right-from-bracket"></i> Salir
+          </button>
+        </div>
+        <div id="driverSelectionList" class="space-y-2 max-h-56 overflow-y-auto pr-1">
+          <!-- Rellenado dinámicamente con los conductores de esta empresa -->
+        </div>
+      </div>
+
+      <!-- PASO 3: AUTENTICACIÓN PERSONAL DE CONDUCTOR (SI TIENE CLAVE ASIGNADA) -->
+      <div id="stepDriverPassword" class="hidden space-y-3.5 bg-blue-50/70 p-4 rounded-2xl border border-blue-200">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-base shadow-sm">
+            <i class="fa-solid fa-user-lock"></i>
+          </div>
+          <div>
+            <h4 class="font-bold text-gray-900 text-sm leading-tight" id="loginDriverTargetName">Nombre Conductor</h4>
+            <p class="text-[11px] text-gray-500">Ingresa tu clave personal para desbloquear tu ruta</p>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Contraseña de Conductor</label>
+          <div class="relative">
+            <input type="password" id="driverLoginPassword" onkeydown="if(event.key==='Enter') submitDriverLogin()" placeholder="Escribe tu contraseña..." class="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm font-semibold focus:border-blue-500 focus:outline-none pr-10 font-mono">
+            <button type="button" onclick="togglePasswordVisibility('driverLoginPassword', 'eyeDriverIcon')" class="absolute right-3 top-3 text-gray-400 hover:text-gray-600">
+              <i class="fa-solid fa-eye" id="eyeDriverIcon"></i>
+            </button>
+          </div>
+          <p id="driverPasswordError" class="hidden text-xs text-rose-600 font-bold mt-1.5 flex items-center gap-1">
+            <i class="fa-solid fa-circle-exclamation"></i> <span id="driverPasswordErrorText">Contraseña incorrecta.</span>
+          </p>
+        </div>
+
+        <div class="flex space-x-2 pt-1">
+          <button type="button" onclick="backToDriverList()" class="px-3 py-2.5 rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-bold flex-1">
+            <i class="fa-solid fa-arrow-left mr-1"></i> Volver
+          </button>
+          <button type="button" onclick="submitDriverLogin()" class="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow flex-[2] flex items-center justify-center gap-1.5 active:scale-95">
+            <i class="fa-solid fa-right-to-bracket"></i> Entrar a mi Ruta
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para Reportar Novedad -->
+  <div id="novedadModal" class="hidden fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-sm rounded-2xl p-5 shadow-2xl space-y-3">
+      <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+        <i class="fa-solid fa-triangle-exclamation text-amber-500"></i>
+        Reportar Novedad
+      </h3>
+      <p class="text-xs text-gray-600">Indica el motivo por el cual no se pudo entregar el pedido:</p>
+      <select id="novedadReason" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm">
+        <option value="Cliente no se encontraba">Cliente no se encontraba</option>
+        <option value="Dirección cerrada / inaccesible">Dirección cerrada / inaccesible</option>
+        <option value="Cliente reprogramó la visita">Cliente reprogramó la visita</option>
+        <option value="Rechazó el pedido">Rechazó el pedido</option>
+        <option value="Otro motivo">Otro motivo</option>
+      </select>
+      <textarea id="novedadNotes" placeholder="Detalles adicionales (opcional)..." class="w-full border border-gray-300 rounded-lg p-2 text-sm h-16"></textarea>
+      <div class="flex space-x-2 pt-2">
+        <button onclick="closeNovedadModal()" class="flex-1 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm font-semibold">Cancelar</button>
+        <button onclick="submitNovedad()" class="flex-1 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold shadow">Confirmar Novedad</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CONFIRMAR ENTREGA CON FOTO -->
+  <div id="modalConfirmDelivery" class="hidden fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs">
+    <div class="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl space-y-3.5 max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b pb-2.5">
+        <div class="flex items-center gap-2">
+          <span class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+            <i class="fa-solid fa-camera"></i>
+          </span>
+          <div>
+            <h3 class="text-base font-bold text-slate-900 leading-tight">Confirmar Entrega</h3>
+            <p id="confirmDeliveryClientName" class="text-xs text-slate-500 truncate max-w-[200px]">Cliente</p>
+          </div>
+        </div>
+        <button onclick="closeDeliveryConfirmModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Datos del pedido -->
+      <div class="bg-slate-50 rounded-2xl p-3 border border-slate-200/80 text-xs space-y-1">
+        <p class="text-slate-500">Dirección de entrega:</p>
+        <p id="confirmDeliveryAddress" class="font-bold text-slate-800 leading-snug">Cra 15 # 85-30</p>
+      </div>
+
+      <!-- Zona de Cámara / Foto de Evidencia -->
+      <div class="space-y-2">
+        <label class="block text-xs font-bold text-slate-700">Foto / Evidencia de Entrega</label>
+        
+        <input type="file" id="deliveryCameraInput" accept="image/*" capture="environment" class="hidden" onchange="handleDeliveryPhotoCaptured(event)">
+
+        <!-- Botón para tomar foto (visible si no hay foto cargada) -->
+        <div id="boxTakeDeliveryPhoto">
+          <button type="button" onclick="document.getElementById('deliveryCameraInput').click()" class="w-full py-4 px-3 rounded-2xl border-2 border-dashed border-blue-300 bg-blue-50/60 hover:bg-blue-100/70 active:scale-[0.99] flex flex-col items-center justify-center gap-2 text-blue-700 transition">
+            <div class="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center text-xl shadow-md shadow-blue-500/30">
+              <i class="fa-solid fa-camera"></i>
+            </div>
+            <div class="text-center">
+              <span class="font-bold text-xs sm:text-sm block">Tomar Foto del Pedido</span>
+              <span class="text-[11px] text-blue-600/80">Toca aquí para abrir la cámara</span>
+            </div>
+          </button>
+        </div>
+
+        <!-- Previsualización de la foto capturada -->
+        <div id="boxDeliveryPhotoPreview" class="hidden space-y-2">
+          <div class="relative rounded-2xl overflow-hidden border border-slate-200 bg-black aspect-4/3 flex items-center justify-center">
+            <img id="imgDeliveryPreview" src="" alt="Foto de entrega" class="w-full h-full object-cover">
+            <span class="absolute top-2 left-2 bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow flex items-center gap-1">
+              <i class="fa-solid fa-check"></i> Foto capturada
+            </span>
+            <button type="button" onclick="removeCapturedPhoto()" class="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-white w-7 h-7 rounded-full flex items-center justify-center text-xs shadow">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </div>
+          <button type="button" onclick="document.getElementById('deliveryCameraInput').click()" class="w-full py-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 bg-blue-50 rounded-xl border border-blue-200 flex items-center justify-center gap-1.5">
+            <i class="fa-solid fa-arrows-rotate"></i> Cambiar / Repetir Foto
+          </button>
+        </div>
+      </div>
+
+      <!-- Observaciones opcionales -->
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Observaciones / Quién Recibió (Opcional)</label>
+        <input type="text" id="confirmDeliveryNotes" placeholder="Ej: Recibió en portería / Don Juan" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:border-blue-500 focus:outline-none">
+      </div>
+
+      <!-- Botones de Acción -->
+      <div class="pt-2 space-y-2">
+        <button id="btnSubmitDeliveryConfirm" onclick="submitDeliveryConfirmation()" class="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-bold text-sm shadow-md shadow-emerald-600/30 transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-circle-check"></i>
+          <span id="btnSubmitDeliveryConfirmText">CONFIRMAR ENTREGA</span>
+        </button>
+        <button type="button" onclick="closeDeliveryConfirmModal()" class="w-full py-2 text-xs text-slate-500 font-semibold hover:text-slate-700 text-center">
+          Cancelar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: VER FOTO COMPROBANTE DE ENTREGA -->
+  <div id="modalViewDeliveryPhoto" class="hidden fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs">
+    <div class="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl space-y-3 max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b pb-2">
+        <div>
+          <h3 class="text-base font-bold text-slate-900 leading-tight">Comprobante de Entrega</h3>
+          <p id="viewPhotoClientName" class="text-xs text-slate-500">Detalles de la entrega</p>
+        </div>
+        <button onclick="closeViewDeliveryPhotoModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 flex items-center justify-center max-h-[380px]">
+        <img id="imgViewDeliveryFull" src="" alt="Comprobante" class="w-full h-auto max-h-[380px] object-contain">
+      </div>
+
+      <div class="bg-slate-50 rounded-2xl p-3 border border-slate-200 text-xs space-y-1">
+        <p class="text-slate-500">Fecha y hora:</p>
+        <p id="viewPhotoDateTime" class="font-bold text-slate-800">-</p>
+        <p id="viewPhotoNotesContainer" class="text-slate-600 pt-1 border-t border-slate-200/60 hidden">
+          Nota: <span id="viewPhotoNotes" class="italic font-medium">-</span>
+        </p>
+      </div>
+
+      <button onclick="closeViewDeliveryPhotoModal()" class="w-full py-2.5 rounded-xl bg-slate-800 text-white text-xs font-bold hover:bg-slate-900 transition">
+        Cerrar
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL: FINALIZAR JORNADA Y RETORNO A PLANTA -->
+  <div id="modalFinishDay" class="hidden fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs">
+    <div class="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl space-y-3.5 max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b pb-2.5">
+        <div class="flex items-center gap-2">
+          <span class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+            <i class="fa-solid fa-warehouse"></i>
+          </span>
+          <div>
+            <h3 class="text-base font-bold text-slate-900 leading-tight">Finalizar Jornada</h3>
+            <p class="text-xs text-slate-500">Retorno a planta / guardar vehículo</p>
+          </div>
+        </div>
+        <button onclick="closeFinishDayModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Resumen de Entregas -->
+      <div class="bg-slate-50 rounded-2xl p-3 border border-slate-200/80 space-y-2 text-xs">
+        <p class="font-bold text-slate-700">Resumen de tu ruta de hoy:</p>
+        <div class="grid grid-cols-3 gap-2 text-center">
+          <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-2">
+            <span class="text-[10px] text-emerald-700 font-bold block uppercase">Entregadas</span>
+            <span id="finishSummaryDelivered" class="text-base font-black text-emerald-800">0</span>
+          </div>
+          <div class="bg-amber-50 border border-amber-200 rounded-xl p-2">
+            <span class="text-[10px] text-amber-700 font-bold block uppercase">Pendientes</span>
+            <span id="finishSummaryPending" class="text-base font-black text-amber-800">0</span>
+          </div>
+          <div class="bg-rose-50 border border-rose-200 rounded-xl p-2">
+            <span class="text-[10px] text-rose-700 font-bold block uppercase">Novedades</span>
+            <span id="finishSummaryFailed" class="text-base font-black text-rose-800">0</span>
+          </div>
+        </div>
+        <div id="finishPendingWarning" class="hidden text-[11px] text-amber-800 bg-amber-50/80 p-2 rounded-xl border border-amber-200">
+          <i class="fa-solid fa-triangle-exclamation mr-1"></i> Aún tienes entregas pendientes. Si finalizas el día, tu ruta se cerrará y quedará archivada.
+        </div>
+      </div>
+
+      <!-- Observaciones / Estado del Vehículo -->
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Observaciones / Estado del Vehículo (Opcional)</label>
+        <textarea id="finishShiftNotes" rows="2" placeholder="Ej: Vehículo entregado sin novedad, tanque medio, etc." class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:border-indigo-500 focus:outline-none"></textarea>
+      </div>
+
+      <div class="bg-indigo-50/70 p-3 rounded-2xl border border-indigo-100 text-xs text-indigo-900 space-y-1">
+        <p class="font-bold flex items-center gap-1.5">
+          <i class="fa-solid fa-circle-info text-indigo-600"></i> ¿Qué sucederá al confirmar?
+        </p>
+        <ul class="list-disc list-inside text-[11px] text-indigo-700 space-y-0.5">
+          <li>El panel de monitoreo verá que <b>vas en camino a la planta a guardar el vehículo</b>.</li>
+          <li>Tu listado activo se cerrará y quedará <b>archivado en el historial</b>.</li>
+        </ul>
+      </div>
+
+      <!-- Botones de Acción -->
+      <div class="pt-2 space-y-2">
+        <button id="btnSubmitFinishDay" onclick="submitFinishDay()" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-blue-700 to-indigo-800 hover:from-blue-800 hover:to-indigo-900 active:scale-[0.99] text-white font-bold text-xs sm:text-sm shadow-md shadow-indigo-700/30 transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-warehouse"></i>
+          <span id="btnSubmitFinishDayText">CONFIRMAR Y RETORNAR A PLANTA</span>
+        </button>
+        <button type="button" onclick="closeFinishDayModal()" class="w-full py-2 text-xs text-slate-500 font-semibold hover:text-slate-700 text-center">
+          Cancelar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: INICIAR RUTA DE HOY -->
+  <div id="modalStartRoute" class="hidden fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs">
+    <div class="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl space-y-3.5 max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b pb-2.5">
+        <div class="flex items-center gap-2">
+          <span class="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+            <i class="fa-solid fa-play"></i>
+          </span>
+          <div>
+            <h3 class="text-base font-bold text-slate-900 leading-tight">Iniciar Ruta de Hoy</h3>
+            <p class="text-xs text-slate-500">Registro oficial de salida a entregas</p>
+          </div>
+        </div>
+        <button onclick="closeStartRouteModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Resumen de Salida -->
+      <div class="bg-blue-50/70 rounded-2xl p-3.5 border border-blue-200/80 text-xs space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-blue-900 font-medium">Hora de inicio / salida:</span>
+          <span id="startModalCurrentTime" class="font-bold text-blue-950 text-sm">-</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-blue-900 font-medium">Paradas asignadas hoy:</span>
+          <span id="startModalStopsCount" class="font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">-</span>
+        </div>
+        <div class="flex items-center justify-between pt-1 border-t border-blue-200/60">
+          <span class="text-blue-900 font-medium">Conductor:</span>
+          <span id="startModalDriverName" class="font-bold text-slate-800">-</span>
+        </div>
+      </div>
+
+      <!-- Observaciones / Kilometraje inicial -->
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Observaciones / Kilometraje de Salida (Opcional)</label>
+        <textarea id="startRouteNotes" rows="2" placeholder="Ej: Km 45.200, vehículo tanqueado, todo listo..." class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:border-blue-500 focus:outline-none"></textarea>
+      </div>
+
+      <div class="bg-indigo-50/70 p-3 rounded-2xl border border-indigo-100 text-xs text-indigo-900 space-y-1">
+        <p class="font-bold flex items-center gap-1.5">
+          <i class="fa-solid fa-circle-info text-indigo-600"></i> ¿Qué sucederá al iniciar?
+        </p>
+        <ul class="list-disc list-inside text-[11px] text-indigo-700 space-y-0.5">
+          <li>Quedará guardada tu <b>hora exacta de inicio</b> para la trazabilidad completa.</li>
+          <li>La empresa verá en vivo que <b>ya saliste de la planta a ruta</b>.</li>
+          <li>Podrás marcar entregas, ver clientes y usar las herramientas de mapa.</li>
+        </ul>
+      </div>
+
+      <!-- Botones de Acción -->
+      <div class="pt-2 space-y-2">
+        <button id="btnSubmitStartRoute" onclick="submitStartRoute()" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 active:scale-[0.99] text-white font-black text-xs sm:text-sm shadow-md shadow-blue-600/30 transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-circle-play"></i>
+          <span id="btnSubmitStartRouteText">SÍ, INICIAR RUTA AHORA</span>
+        </button>
+        <button type="button" onclick="closeStartRouteModal()" class="w-full py-2 text-xs text-slate-500 font-semibold hover:text-slate-700 text-center">
+          Cancelar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CONFIRMAR LLEGADA A PLANTA -->
+  <div id="modalConfirmArrivalPlant" class="hidden fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs">
+    <div class="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl space-y-3.5 max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b pb-2.5">
+        <div class="flex items-center gap-2">
+          <span class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+            <i class="fa-solid fa-square-check"></i>
+          </span>
+          <div>
+            <h3 class="text-base font-bold text-slate-900 leading-tight">Llegada a la Planta</h3>
+            <p class="text-xs text-slate-500">Cierre total de la jornada laboral</p>
+          </div>
+        </div>
+        <button onclick="closeArrivalPlantModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Trazabilidad del Retorno y Jornada -->
+      <div class="bg-emerald-50/70 rounded-2xl p-3.5 border border-emerald-200/80 text-xs space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-emerald-800 font-medium">Hora inicio de ruta:</span>
+          <span id="arrivalModalRouteStartTime" class="font-bold text-emerald-900">-</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-emerald-800 font-medium">Fin de entregas:</span>
+          <span id="arrivalModalRouteEndTime" class="font-bold text-emerald-900">-</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-emerald-800 font-medium">Hora de llegada a planta:</span>
+          <span id="arrivalModalCurrentTime" class="font-bold text-emerald-900">-</span>
+        </div>
+        <div class="flex items-center justify-between pt-1 border-t border-emerald-200/60">
+          <span class="text-emerald-800 font-medium">Tiempo de retorno:</span>
+          <span id="arrivalModalDuration" class="font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">-</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-emerald-800 font-medium">Jornada total hoy:</span>
+          <span id="arrivalModalTotalWorkday" class="font-bold text-emerald-900 bg-emerald-200/80 px-2 py-0.5 rounded-full">-</span>
+        </div>
+      </div>
+
+      <!-- Notas de llegada -->
+      <div>
+        <label class="block text-xs font-bold text-slate-700 mb-1">Observaciones / Entrega de Llaves (Opcional)</label>
+        <textarea id="arrivalPlantNotes" rows="2" placeholder="Ej: Vehículo parqueado en bahía 2, llaves entregadas a Don Pedro..." class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:border-emerald-500 focus:outline-none"></textarea>
+      </div>
+
+      <!-- Botones de Acción -->
+      <div class="pt-2 space-y-2">
+        <button id="btnSubmitArrivalPlant" onclick="submitArrivalAtPlant()" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 active:scale-[0.99] text-white font-bold text-xs sm:text-sm shadow-md shadow-emerald-600/30 transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-circle-check"></i>
+          <span id="btnSubmitArrivalPlantText">CONFIRMAR LLEGADA Y CERRAR DÍA</span>
+        </button>
+        <button type="button" onclick="closeArrivalPlantModal()" class="w-full py-2 text-xs text-slate-500 font-semibold hover:text-slate-700 text-center">
+          Cancelar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentCompany = null; // { id, name, code, email }
+    let currentCompanyId = localStorage.getItem('enrutador_driver_company_id') || '';
+    let currentCompanyName = localStorage.getItem('enrutador_driver_company_name') || '';
+    let currentCompanyPass = localStorage.getItem('enrutador_driver_company_pass') || '';
+    let currentDriverId = localStorage.getItem('enrutador_driver_id') || '';
+    let currentDriverName = localStorage.getItem('enrutador_driver_name') || '';
+    let companyDrivers = [];
+    let myDeliveries = [];
+    let currentFilter = 'all';
+    let deferredPrompt = null;
+    let selectedDeliveryForNovedad = null;
+    let unsubscribeDeliveries = null;
+    let unsubscribeDriverShift = null;
+    let currentDriverShift = null;
+    let targetCompanyHint = ''; // código o ID extraído de la URL (?empresa=...)
+
+    // Soporte PWA
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      const btn = document.getElementById('btnInstall');
+      if (btn) btn.classList.remove('hidden');
+    });
+
+    function promptInstallPWA() {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then(() => {
+          deferredPrompt = null;
+          document.getElementById('btnInstall').classList.add('hidden');
+        });
+      } else {
+        alert('Para instalar esta app en tu celular:\n1. Toca los 3 puntos (menú) de Google Chrome arriba a la derecha.\n2. Toca "Instalar aplicación" o "Agregar a la pantalla principal".');
+      }
+    }
+
+    // Inicialización
+    document.addEventListener('DOMContentLoaded', async () => {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').catch(console.error);
+      }
+
+      // 1. Verificar si viene con parámetro de URL (?empresa=...)
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlCompanyParam = urlParams.get('empresa');
+      if (urlCompanyParam) {
+        targetCompanyHint = urlCompanyParam.trim();
+      }
+
+      // Si tenemos empresa y clave guardada en localStorage, intentamos validar silenciosamente
+      if (currentCompanyId && currentCompanyPass) {
+        try {
+          const comp = await window.FirebaseService.verifyCompanyForDriver(currentCompanyId, currentCompanyPass);
+          currentCompany = comp;
+          currentCompanyName = comp.name;
+          updateHeaderCompany();
+          await loadCompanyDrivers();
+
+          // Si el conductor ya estaba seleccionado
+          const savedPass = localStorage.getItem('enrutador_driver_pass') || '';
+          const savedDriver = companyDrivers.find(d => d.id === currentDriverId);
+
+          if (currentDriverId && savedDriver && (!savedDriver.password || savedDriver.password === savedPass)) {
+            startDeliveriesListener();
+            return;
+          } else {
+            // Empresa autenticada, pero falta elegir conductor o validar su clave personal
+            showStepDriverSelect();
+            openProfileModal();
+            return;
+          }
+        } catch (err) {
+          console.warn('Sesión de empresa guardada no válida:', err.message);
+          clearCompanySession();
+        }
+      }
+
+      // Si no hay sesión válida, abrir el modal en el Paso 1: Contraseña de la Empresa
+      await setupCompanyAuthView();
+      openProfileModal();
+    });
+
+    let pendingDriverId = '';
+    let pendingDriverName = '';
+
+    function updateHeaderCompany() {
+      const name = currentCompanyName || (currentCompany ? currentCompany.name : 'Empresa');
+      document.getElementById('headerCompanyText').innerText = name;
+    }
+
+    async function loadCompanyDrivers() {
+      if (!currentCompanyId) {
+        companyDrivers = [];
+        return;
+      }
+      companyDrivers = await window.FirebaseService.getDrivers(currentCompanyId);
+    }
+
+    // Prepara la pantalla de ingreso con la contraseña de la empresa
+    async function setupCompanyAuthView() {
+      const titleEl = document.getElementById('companyAuthDisplayTitle');
+      const subEl = document.getElementById('companyAuthDisplaySubtitle');
+      const idField = document.getElementById('companyIdentifierField');
+      const idInput = document.getElementById('companyIdentifierInput');
+      const passInput = document.getElementById('companyAuthPassword');
+      const errorEl = document.getElementById('companyAuthError');
+
+      if (passInput) passInput.value = '';
+      if (errorEl) errorEl.classList.add('hidden');
+
+      // Si viene por enlace/QR con ?empresa=...
+      if (targetCompanyHint) {
+        try {
+          const pub = await window.FirebaseService.getCompanyPublicInfo(targetCompanyHint);
+          if (pub) {
+            titleEl.innerText = pub.name;
+            subEl.innerText = 'Digita la contraseña de la empresa para desbloquear el acceso';
+            idInput.value = pub.code || pub.id;
+            idField.classList.add('hidden'); // No hace falta pedir el código porque ya viene en el QR
+            document.getElementById('btnToggleManualIdentifier').classList.add('hidden');
+          } else {
+            titleEl.innerText = 'Acceso de Empresa';
+            idInput.value = targetCompanyHint;
+            idField.classList.remove('hidden');
+          }
+        } catch (e) {
+          titleEl.innerText = 'Acceso de Empresa';
+        }
+      } else {
+        titleEl.innerText = 'Acceso de Empresa';
+        subEl.innerText = 'Digita la contraseña de tu empresa para ingresar a las rutas';
+        idInput.value = '';
+        idField.classList.add('hidden');
+        document.getElementById('btnToggleManualIdentifier').classList.remove('hidden');
+      }
+
+      showStepCompanyAuth();
+    }
+
+    function toggleManualCompanyIdentifier() {
+      const idField = document.getElementById('companyIdentifierField');
+      if (idField) {
+        idField.classList.toggle('hidden');
+      }
+    }
+
+    // Paso 1: Valida la contraseña de la empresa
+    async function submitCompanyAuth() {
+      const passInput = document.getElementById('companyAuthPassword');
+      const idInput = document.getElementById('companyIdentifierInput');
+      const errorEl = document.getElementById('companyAuthError');
+      const errorText = document.getElementById('companyAuthErrorText');
+      const btn = document.getElementById('btnSubmitCompanyAuth');
+
+      const pass = passInput ? passInput.value.trim() : '';
+      const identifier = (idInput?.value || targetCompanyHint || '').trim();
+
+      if (!pass) {
+        errorEl.classList.remove('hidden');
+        errorText.innerText = 'Por favor digita la contraseña de la empresa.';
+        return;
+      }
+
+      errorEl.classList.add('hidden');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1"></i> Validando...`;
+      }
+
+      try {
+        const comp = await window.FirebaseService.verifyCompanyForDriver(identifier, pass);
+        currentCompany = comp;
+        currentCompanyId = comp.id;
+        currentCompanyName = comp.name;
+        currentCompanyPass = pass;
+
+        localStorage.setItem('enrutador_driver_company_id', comp.id);
+        localStorage.setItem('enrutador_driver_company_name', comp.name);
+        localStorage.setItem('enrutador_driver_company_pass', pass);
+
+        updateHeaderCompany();
+        await loadCompanyDrivers();
+        showStepDriverSelect();
+      } catch (err) {
+        errorEl.classList.remove('hidden');
+        errorText.innerText = err.message || 'Contraseña de la empresa incorrecta.';
+        // Si falló por ambigüedad de clave, mostrar el campo de código/correo
+        if (err.message && err.message.includes('código o correo')) {
+          document.getElementById('companyIdentifierField').classList.remove('hidden');
+        }
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = `<i class="fa-solid fa-key mr-1"></i> Validar Empresa`;
+        }
+      }
+    }
+
+    // Paso 2: Mostrar lista de conductores de la empresa autenticada
+    function showStepDriverSelect() {
+      document.getElementById('stepCompanyAuth').classList.add('hidden');
+      document.getElementById('stepDriverPassword').classList.add('hidden');
+      document.getElementById('stepDriverSelect').classList.remove('hidden');
+      document.getElementById('profileModalTitle').innerText = 'Seleccionar Conductor';
+      document.getElementById('driverSelectCompanyBadge').innerText = `🏢 ${currentCompanyName || 'Empresa'}`;
+
+      renderDriverSelectionList();
+    }
+
+    function showStepCompanyAuth() {
+      document.getElementById('stepDriverSelect').classList.add('hidden');
+      document.getElementById('stepDriverPassword').classList.add('hidden');
+      document.getElementById('stepCompanyAuth').classList.remove('hidden');
+      document.getElementById('profileModalTitle').innerText = 'Acceso de Conductor';
+    }
+
+    function renderDriverSelectionList() {
+      const listEl = document.getElementById('driverSelectionList');
+      if (!listEl) return;
+
+      if (companyDrivers.length === 0) {
+        listEl.innerHTML = `
+          <div class="p-4 text-center text-xs text-gray-500 bg-gray-50 rounded-xl border border-gray-200">
+            <i class="fa-solid fa-users-slash text-2xl text-gray-400 mb-2 block"></i>
+            No hay conductores registrados para <b>${currentCompanyName || 'esta empresa'}</b>.<br>
+            Pide al administrador que te registre en el panel.
+          </div>
+        `;
+        return;
+      }
+
+      listEl.innerHTML = companyDrivers.map(d => `
+        <button onclick="selectDriver('${d.id}', '${encodeURIComponent(d.name)}')" class="w-full text-left p-3 rounded-2xl border ${d.id === currentDriverId ? 'border-blue-500 bg-blue-50/70 shadow-xs' : 'border-gray-200 hover:bg-gray-50'} transition flex items-center justify-between group active:scale-[0.99]">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs shadow-xs">
+              ${d.name.substring(0, 2).toUpperCase()}
+            </div>
+            <div>
+              <p class="font-bold text-gray-800 text-sm leading-tight">${d.name}</p>
+              <p class="text-xs text-gray-500 mt-0.5">${d.vehicle || 'Vehículo no asignado'}</p>
+            </div>
+          </div>
+          <div class="flex items-center text-xs text-blue-600 font-semibold gap-1">
+            ${d.password ? '<i class="fa-solid fa-lock text-[11px] text-amber-500" title="Requiere contraseña personal"></i>' : ''}
+            <i class="fa-solid fa-chevron-right text-gray-400 text-xs ml-1 group-hover:translate-x-0.5 transition"></i>
+          </div>
+        </button>
+      `).join('');
+    }
+
+    function selectDriver(id, encodedName) {
+      pendingDriverId = id;
+      pendingDriverName = decodeURIComponent(encodedName);
+
+      const driver = companyDrivers.find(d => d.id === id);
+      const savedPass = localStorage.getItem('enrutador_driver_pass') || '';
+
+      // Si el conductor no tiene contraseña configurada
+      if (!driver || !driver.password) {
+        completeDriverLogin(id, pendingDriverName, '');
+        return;
+      }
+
+      // Si ya tenemos guardada su clave personal y coincide
+      if (driver.password === savedPass && id === currentDriverId) {
+        completeDriverLogin(id, pendingDriverName, savedPass);
+        return;
+      }
+
+      // Si el conductor tiene contraseña configurada, solicitar clave personal
+      document.getElementById('loginDriverTargetName').innerText = pendingDriverName;
+      document.getElementById('driverLoginPassword').value = '';
+      document.getElementById('driverPasswordError').classList.add('hidden');
+      document.getElementById('stepDriverSelect').classList.add('hidden');
+      document.getElementById('stepDriverPassword').classList.remove('hidden');
+      document.getElementById('profileModalTitle').innerText = 'Contraseña de Conductor';
+
+      setTimeout(() => {
+        const inp = document.getElementById('driverLoginPassword');
+        if (inp) inp.focus();
+      }, 150);
+    }
+
+    function backToDriverList() {
+      pendingDriverId = '';
+      pendingDriverName = '';
+      document.getElementById('stepDriverPassword').classList.add('hidden');
+      document.getElementById('stepDriverSelect').classList.remove('hidden');
+      document.getElementById('driverPasswordError').classList.add('hidden');
+      document.getElementById('profileModalTitle').innerText = 'Seleccionar Conductor';
+    }
+
+    async function submitDriverLogin() {
+      const pass = document.getElementById('driverLoginPassword').value;
+      const errorEl = document.getElementById('driverPasswordError');
+      const errorText = document.getElementById('driverPasswordErrorText');
+
+      if (!pass) {
+        errorEl.classList.remove('hidden');
+        errorText.innerText = 'Por favor ingresa tu contraseña de conductor.';
+        return;
+      }
+
+      try {
+        await window.FirebaseService.verifyDriverPassword(pendingDriverId, pass);
+        completeDriverLogin(pendingDriverId, pendingDriverName, pass);
+      } catch (err) {
+        errorEl.classList.remove('hidden');
+        errorText.innerText = err.message || 'Contraseña incorrecta.';
+      }
+    }
+
+    function completeDriverLogin(id, name, pass) {
+      currentDriverId = id;
+      currentDriverName = name;
+      localStorage.setItem('enrutador_driver_id', id);
+      localStorage.setItem('enrutador_driver_name', name);
+      localStorage.setItem('enrutador_driver_pass', pass || '');
+
+      document.getElementById('headerDriverName').innerText = name;
+      document.getElementById('btnProfileText').innerText = name.split(' ')[0];
+      closeProfileModal();
+      startDeliveriesListener();
+    }
+
+    function togglePasswordVisibility(inputId, iconId) {
+      const input = document.getElementById(inputId);
+      const icon = document.getElementById(iconId);
+      if (!input || !icon) return;
+      if (input.type === 'password') {
+        input.type = 'text';
+        icon.className = 'fa-solid fa-eye-slash';
+      } else {
+        input.type = 'password';
+        icon.className = 'fa-solid fa-eye';
+      }
+    }
+
+    function openProfileModal() {
+      document.getElementById('profileModal').classList.remove('hidden');
+    }
+
+    function closeProfileModal() {
+      // Si no hay empresa ni conductor autenticado, no permitir cerrar el modal en blanco
+      if (!currentCompanyId || !currentDriverId) {
+        return;
+      }
+      document.getElementById('profileModal').classList.add('hidden');
+    }
+
+    function changeProfile() {
+      if (currentCompanyId) {
+        showStepDriverSelect();
+      } else {
+        setupCompanyAuthView();
+      }
+      openProfileModal();
+    }
+
+    function promptChangeCompany() {
+      if (!confirm('¿Deseas salir de esta empresa para ingresar a otra?')) return;
+      clearCompanySession();
+      setupCompanyAuthView();
+      openProfileModal();
+    }
+
+    function clearCompanySession() {
+      localStorage.removeItem('enrutador_driver_company_id');
+      localStorage.removeItem('enrutador_driver_company_name');
+      localStorage.removeItem('enrutador_driver_company_pass');
+      localStorage.removeItem('enrutador_driver_id');
+      localStorage.removeItem('enrutador_driver_name');
+      localStorage.removeItem('enrutador_driver_pass');
+      currentCompany = null;
+      currentCompanyId = '';
+      currentCompanyName = '';
+      currentCompanyPass = '';
+      currentDriverId = '';
+      currentDriverName = '';
+      companyDrivers = [];
+      myDeliveries = [];
+      if (unsubscribeDeliveries) {
+        unsubscribeDeliveries();
+        unsubscribeDeliveries = null;
+      }
+      if (unsubscribeDriverShift) {
+        unsubscribeDriverShift();
+        unsubscribeDriverShift = null;
+      }
+      currentDriverShift = null;
+      document.getElementById('headerCompanyText').innerText = 'Empresa';
+      document.getElementById('headerDriverName').innerText = 'Conductor no seleccionado';
+      document.getElementById('btnProfileText').innerText = 'Perfil';
+    }
+
+    function logoutDriver() {
+      if (!confirm('¿Deseas cerrar sesión de tu ruta?')) return;
+      localStorage.removeItem('enrutador_driver_id');
+      localStorage.removeItem('enrutador_driver_name');
+      localStorage.removeItem('enrutador_driver_pass');
+      currentDriverId = '';
+      currentDriverName = '';
+      if (unsubscribeDeliveries) {
+        unsubscribeDeliveries();
+        unsubscribeDeliveries = null;
+      }
+      if (unsubscribeDriverShift) {
+        unsubscribeDriverShift();
+        unsubscribeDriverShift = null;
+      }
+      currentDriverShift = null;
+      document.getElementById('headerDriverName').innerText = 'Conductor no seleccionado';
+      document.getElementById('btnProfileText').innerText = 'Perfil';
+      document.getElementById('deliveriesContainer').innerHTML = `
+        <div class="text-center py-12 bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-3">
+          <div class="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto text-2xl">
+            <i class="fa-solid fa-lock"></i>
+          </div>
+          <h3 class="font-bold text-gray-800 text-base">Acceso Protegido</h3>
+          <p class="text-xs text-gray-500">Selecciona tu nombre de conductor e ingresa tu clave para ver tu ruta asignada.</p>
+          <div class="flex flex-col sm:flex-row justify-center gap-2 pt-2">
+            <button onclick="changeProfile()" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow flex items-center justify-center gap-1.5 active:scale-95">
+              <i class="fa-solid fa-user-check"></i> Elegir Conductor
+            </button>
+            <button onclick="promptChangeCompany()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-building"></i> Cambiar Empresa
+            </button>
+          </div>
+        </div>
+      `;
+      changeProfile();
+    }
+
+    // ==================== LISTENER EN TIEMPO REAL CON FIRESTORE ====================
+    function startDeliveriesListener() {
+      if (unsubscribeDeliveries) {
+        unsubscribeDeliveries();
+      }
+      if (unsubscribeDriverShift) {
+        unsubscribeDriverShift();
+      }
+
+      const today = (window.FirebaseService && typeof window.FirebaseService.getOperationalDate === 'function')
+        ? window.FirebaseService.getOperationalDate()
+        : new Date().toISOString().split('T')[0];
+      document.getElementById('headerDriverName').innerText = currentDriverName || 'Mi Ruta';
+      document.getElementById('btnProfileText').innerText = currentDriverName ? currentDriverName.split(' ')[0] : 'Perfil';
+
+      // 1. Escuchar entregas del día
+      unsubscribeDeliveries = window.FirebaseService.subscribeDeliveries(currentCompanyId, today, (allDeliveries) => {
+        // Filtrar entregas asignadas a este conductor
+        myDeliveries = allDeliveries.filter(d => d.driverId === currentDriverId);
+        renderDeliveries();
+        updateStats();
+      });
+
+      // 2. Escuchar turno / jornada del conductor en tiempo real
+      if (typeof window.FirebaseService.subscribeSingleDriverShift === 'function') {
+        unsubscribeDriverShift = window.FirebaseService.subscribeSingleDriverShift(currentCompanyId, currentDriverId, today, (shift) => {
+          currentDriverShift = shift;
+          renderDeliveries();
+          updateStats();
+        });
+      }
+    }
+
+    function setFilter(filter) {
+      currentFilter = filter;
+      ['All', 'Pending', 'Delivered'].forEach(f => {
+        const btn = document.getElementById('filter' + f);
+        if (f.toLowerCase() === filter) {
+          btn.className = 'px-3 py-1 text-xs font-semibold rounded-full bg-blue-600 text-white shadow-sm whitespace-nowrap';
+        } else {
+          btn.className = 'px-3 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 whitespace-nowrap';
+        }
+      });
+      renderDeliveries();
+    }
+
+    function updateStats() {
+      const total = myDeliveries.length;
+      const delivered = myDeliveries.filter(d => d.status === 'delivered').length;
+      const pending = myDeliveries.filter(d => d.status === 'pending' || d.status === 'in_transit').length;
+
+      document.getElementById('countAll').innerText = total;
+      document.getElementById('countPending').innerText = pending;
+      document.getElementById('countDelivered').innerText = delivered;
+
+      const pct = total > 0 ? Math.round((delivered / total) * 100) : 0;
+      document.getElementById('progressText').innerText = `${delivered} / ${total} (${pct}%)`;
+      document.getElementById('progressBar').style.width = `${pct}%`;
+    }
+
+    function renderDeliveries() {
+      const container = document.getElementById('deliveriesContainer');
+      const barFinish = document.getElementById('barFinishDayContainer');
+      const filterBar = document.getElementById('filterBarContainer');
+      const routeTools = document.getElementById('routeToolsContainer');
+      const startedBanner = document.getElementById('headerRouteStartedBanner');
+      const startedTimeEl = document.getElementById('headerRouteStartedTime');
+
+      // REINICIO DIARIO A LAS 6:00 AM (COLOMBIA):
+      // Si el turno guardado fue cerrado o inició ANTES de las 6:00 AM de hoy,
+      // corresponde a la jornada anterior. Se descarta automáticamente para dar paso
+      // al nuevo día laboral limpio.
+      const today6amMs = (typeof window.FirebaseService?.getToday6amTimestamp === 'function') 
+        ? window.FirebaseService.getToday6amTimestamp() 
+        : 0;
+
+      let effectiveShift = currentDriverShift;
+      if (effectiveShift && today6amMs > 0) {
+        const arrivalMs = effectiveShift.arrivedAtPlantAt ? new Date(effectiveShift.arrivedAtPlantAt).getTime() : 0;
+        const finishedMs = effectiveShift.finishedAt ? new Date(effectiveShift.finishedAt).getTime() : 0;
+        const startedMs = effectiveShift.startedAt ? new Date(effectiveShift.startedAt).getTime() : 0;
+        
+        // Si el turno cerró antes de las 6:00 AM de hoy, o si su última actividad fue antes de las 6:00 AM:
+        if ((arrivalMs > 0 && arrivalMs < today6amMs) || 
+            (finishedMs > 0 && finishedMs < today6amMs) ||
+            (startedMs > 0 && startedMs < today6amMs && effectiveShift.status === 'arrived_at_plant')) {
+          effectiveShift = null;
+        }
+      }
+
+      // 1. Si el conductor ya llegó a la planta y cerró totalmente su jornada HOY:
+      if (effectiveShift && effectiveShift.status === 'arrived_at_plant') {
+        if (barFinish) barFinish.classList.add('hidden');
+        if (filterBar) filterBar.classList.add('hidden');
+        if (routeTools) routeTools.classList.add('hidden');
+        if (startedBanner) startedBanner.classList.add('hidden');
+
+        const deliveredCount = myDeliveries.filter(d => d.status === 'delivered').length;
+        const totalCount = myDeliveries.length;
+        let startTimeStr = '-';
+        let finishedTimeStr = '-';
+        let arrivedTimeStr = '-';
+
+        if (effectiveShift.startedAt) {
+          try {
+            startTimeStr = new Date(effectiveShift.startedAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
+          } catch(e) {}
+        }
+        if (effectiveShift.finishedAt) {
+          try {
+            finishedTimeStr = new Date(effectiveShift.finishedAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
+          } catch(e) {}
+        }
+        if (effectiveShift.arrivedAtPlantAt) {
+          try {
+            arrivedTimeStr = new Date(effectiveShift.arrivedAtPlantAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
+          } catch(e) {}
+        }
+
+        const deliveriesDurationStr = formatDurationBetween(effectiveShift.startedAt, effectiveShift.finishedAt);
+        const returnDurationStr = formatDurationBetween(effectiveShift.finishedAt, effectiveShift.arrivedAtPlantAt);
+        const totalWorkdayStr = formatDurationBetween(effectiveShift.startedAt, effectiveShift.arrivedAtPlantAt);
+
+        container.innerHTML = `
+          <div class="bg-gradient-to-b from-slate-900 via-emerald-950 to-slate-900 text-white rounded-3xl p-6 shadow-xl text-center space-y-4 border border-emerald-500/30">
+            <div class="relative w-24 h-24 mx-auto flex items-center justify-center">
+              <div class="w-20 h-20 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 text-slate-950 flex items-center justify-center text-3xl shadow-lg shadow-emerald-500/40">
+                <i class="fa-solid fa-building-circle-check"></i>
+              </div>
+            </div>
+
+            <div>
+              <span class="inline-block px-3 py-1 bg-emerald-500/20 text-emerald-300 font-bold text-xs rounded-full border border-emerald-400/40 mb-2">
+                🏢 EN PLANTA • JORNADA FINALIZADA
+              </span>
+              <h2 class="text-xl font-black text-white">¡Vehículo Guardado y Día Cerrado!</h2>
+              <p class="text-xs text-emerald-200 mt-1 max-w-xs mx-auto leading-relaxed">
+                Has registrado exitosamente tu llegada a la planta. Tu jornada de hoy ha finalizado con total trazabilidad para la empresa.
+              </p>
+            </div>
+
+            <!-- Trazabilidad Completa -->
+            <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-4 grid grid-cols-2 gap-3 text-left border border-emerald-500/20 text-xs">
+              <div>
+                <span class="text-[11px] text-emerald-300 block">Salida / Inicio ruta:</span>
+                <span class="font-bold text-sm text-white">${startTimeStr}</span>
+              </div>
+              <div>
+                <span class="text-[11px] text-emerald-300 block">Fin de entregas:</span>
+                <span class="font-bold text-sm text-white">${finishedTimeStr}</span>
+              </div>
+              <div>
+                <span class="text-[11px] text-emerald-300 block">Llegada a planta:</span>
+                <span class="font-bold text-sm text-emerald-300">${arrivedTimeStr}</span>
+              </div>
+              <div>
+                <span class="text-[11px] text-emerald-300 block">Jornada total hoy:</span>
+                <span class="font-bold text-sm text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded-md">${totalWorkdayStr}</span>
+              </div>
+              <div>
+                <span class="text-[11px] text-emerald-300 block">Tiempo en ruta:</span>
+                <span class="font-bold text-xs text-white">${deliveriesDurationStr}</span>
+              </div>
+              <div>
+                <span class="text-[11px] text-emerald-300 block">Tiempo de retorno:</span>
+                <span class="font-bold text-xs text-white">${returnDurationStr}</span>
+              </div>
+              <div class="col-span-2 pt-2 border-t border-white/10">
+                <span class="text-[11px] text-emerald-300 block">Entregas de hoy:</span>
+                <span class="font-bold text-sm text-emerald-400">${deliveredCount} de ${totalCount} completadas</span>
+              </div>
+              ${effectiveShift.notes ? `
+                <div class="col-span-2 pt-2 border-t border-white/10">
+                  <span class="text-[11px] text-emerald-300 block">Nota de fin de ruta:</span>
+                  <span class="italic text-white">&ldquo;${effectiveShift.notes}&rdquo;</span>
+                </div>
+              ` : ''}
+              ${effectiveShift.arrivalNotes ? `
+                <div class="col-span-2 pt-2 border-t border-white/10">
+                  <span class="text-[11px] text-emerald-300 block">Nota de llegada / llaves:</span>
+                  <span class="italic text-white">&ldquo;${effectiveShift.arrivalNotes}&rdquo;</span>
+                </div>
+              ` : ''}
+            </div>
+
+            <div class="pt-2 space-y-2.5">
+              <button onclick="promptStartNewDay()" class="w-full py-3 px-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-700 active:scale-[0.99] text-white font-black text-xs sm:text-sm rounded-2xl shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 transition">
+                <i class="fa-solid fa-play"></i>
+                <span>INICIAR NUEVA JORNADA / NUEVA RUTA</span>
+              </button>
+
+              <button onclick="toggleCompletedSummaryAccordion()" class="w-full py-2.5 px-4 bg-white/10 hover:bg-white/20 active:scale-[0.99] text-white rounded-xl text-xs font-bold border border-white/20 flex items-center justify-center gap-2 transition">
+                <i class="fa-solid fa-list-check"></i>
+                <span id="btnSummaryAccordionText">Ver entregas realizadas hoy (${deliveredCount})</span>
+              </button>
+
+              <div id="completedSummaryList" class="hidden text-left bg-white text-slate-800 rounded-2xl p-3 max-h-72 overflow-y-auto space-y-2 text-xs shadow-inner">
+                ${myDeliveries.length === 0 ? '<p class="text-center py-4 text-slate-400">Sin registros</p>' : myDeliveries.map((del, i) => {
+                  const client = del.client || {};
+                  const isDel = del.status === 'delivered';
+                  let time = del.deliveredAt ? new Date(del.deliveredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+                  return `
+                    <div class="p-2.5 rounded-xl border ${isDel ? 'border-emerald-200 bg-emerald-50/60' : 'border-slate-200 bg-slate-50'} flex items-center justify-between">
+                      <div class="truncate mr-2">
+                        <span class="font-bold text-slate-900 block truncate">${i+1}. ${client.fullName || 'Cliente'}</span>
+                        <span class="text-[11px] text-slate-500 block truncate">${client.address || ''}</span>
+                      </div>
+                      <div class="shrink-0 text-right">
+                        ${isDel ? `<span class="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">Entregado ${time}</span>` : `<span class="text-[10px] font-bold text-slate-500">${del.status}</span>`}
+                        ${del.deliveryProofPhoto ? `
+                          <button onclick="viewDeliveryPhoto('${del.id}')" class="block mt-1 text-[10px] font-bold text-blue-600 hover:underline">
+                            <i class="fa-solid fa-camera"></i> Foto
+                          </button>
+                        ` : ''}
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+
+              <button onclick="promptReopenRoute()" class="w-full py-2 text-xs text-emerald-300 hover:text-white underline">
+                ¿Necesitas continuar la ruta? Reabrir entregas
+              </button>
+
+              <button onclick="logoutDriver()" class="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 active:scale-[0.99] text-white rounded-xl text-xs font-bold border border-slate-700 transition">
+                Cerrar Sesión
+              </button>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      // 2. Si el conductor ya finalizó sus entregas y va en camino a planta HOY:
+      if (effectiveShift && effectiveShift.status === 'returning_to_plant') {
+        if (barFinish) barFinish.classList.add('hidden');
+        if (filterBar) filterBar.classList.add('hidden');
+        if (routeTools) routeTools.classList.add('hidden');
+        if (startedBanner) startedBanner.classList.add('hidden');
+
+        const deliveredCount = myDeliveries.filter(d => d.status === 'delivered').length;
+        const totalCount = myDeliveries.length;
+        let startTimeStr = '-';
+        let finishedTimeStr = '-';
+
+        if (effectiveShift.startedAt) {
+          try {
+            startTimeStr = new Date(effectiveShift.startedAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
+          } catch(e) {}
+        }
+        if (effectiveShift.finishedAt) {
+          try {
+            finishedTimeStr = new Date(effectiveShift.finishedAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
+          } catch(e) {}
+        }
+
+        const deliveriesDurationStr = formatDurationBetween(effectiveShift.startedAt, effectiveShift.finishedAt);
+
+        container.innerHTML = `
+          <div class="bg-gradient-to-b from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 shadow-xl text-center space-y-4 border border-indigo-500/20">
+            <div class="relative w-24 h-24 mx-auto flex items-center justify-center">
+              <span class="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping"></span>
+              <div class="w-20 h-20 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center text-3xl shadow-lg shadow-emerald-500/30">
+                <i class="fa-solid fa-warehouse"></i>
+              </div>
+            </div>
+
+            <div>
+              <span class="inline-block px-3 py-1 bg-emerald-500/20 text-emerald-300 font-bold text-xs rounded-full border border-emerald-400/40 mb-2">
+                🏁 RUTA FINALIZADA
+              </span>
+              <h2 class="text-xl font-black text-white">En Retorno a la Planta</h2>
+              <p class="text-xs text-indigo-200 mt-1 max-w-xs mx-auto leading-relaxed">
+                Vas en camino a la planta a guardar el vehículo. Tu ruta activa ha sido cerrada y guardada en el historial.
+              </p>
+            </div>
+
+            <!-- Botón Destacado: YA LLEGUÉ A LA PLANTA -->
+            <div class="pt-1">
+              <button onclick="openArrivalPlantModal()" class="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 active:scale-[0.98] text-slate-950 font-black text-xs sm:text-sm rounded-2xl shadow-xl shadow-emerald-500/30 flex items-center justify-center gap-2 transition animate-bounce">
+                <i class="fa-solid fa-building-circle-check text-lg"></i>
+                <span>¡YA LLEGUÉ A LA PLANTA / GUARDAR VEHÍCULO!</span>
+              </button>
+            </div>
+
+            <!-- Resumen de Entregas -->
+            <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-4 grid grid-cols-2 gap-3 text-left border border-white/10 text-xs">
+              <div>
+                <span class="text-[11px] text-indigo-300 block">Hora de inicio / salida:</span>
+                <span class="font-bold text-sm text-white">${startTimeStr}</span>
+              </div>
+              <div>
+                <span class="text-[11px] text-indigo-300 block">Fin de entregas:</span>
+                <span class="font-bold text-sm text-white">${finishedTimeStr}</span>
+              </div>
+              <div>
+                <span class="text-[11px] text-indigo-300 block">Tiempo en entregas:</span>
+                <span class="font-bold text-sm text-emerald-300">${deliveriesDurationStr}</span>
+              </div>
+              <div>
+                <span class="text-[11px] text-indigo-300 block">Entregas de hoy:</span>
+                <span class="font-bold text-sm text-emerald-400">${deliveredCount} de ${totalCount}</span>
+              </div>
+              ${effectiveShift.notes ? `
+                <div class="col-span-2 pt-2 border-t border-white/10">
+                  <span class="text-[11px] text-indigo-300 block">Nota reportada:</span>
+                  <span class="italic text-white">&ldquo;${effectiveShift.notes}&rdquo;</span>
+                </div>
+              ` : ''}
+            </div>
+
+            <div class="pt-2 space-y-2.5">
+              <button onclick="toggleCompletedSummaryAccordion()" class="w-full py-2.5 px-4 bg-white/10 hover:bg-white/20 active:scale-[0.99] text-white rounded-xl text-xs font-bold border border-white/20 flex items-center justify-center gap-2 transition">
+                <i class="fa-solid fa-list-check"></i>
+                <span id="btnSummaryAccordionText">Ver entregas realizadas hoy (${deliveredCount})</span>
+              </button>
+
+              <div id="completedSummaryList" class="hidden text-left bg-white text-slate-800 rounded-2xl p-3 max-h-72 overflow-y-auto space-y-2 text-xs shadow-inner">
+                ${myDeliveries.length === 0 ? '<p class="text-center py-4 text-slate-400">Sin registros</p>' : myDeliveries.map((del, i) => {
+                  const client = del.client || {};
+                  const isDel = del.status === 'delivered';
+                  let time = del.deliveredAt ? new Date(del.deliveredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+                  return `
+                    <div class="p-2.5 rounded-xl border ${isDel ? 'border-emerald-200 bg-emerald-50/60' : 'border-slate-200 bg-slate-50'} flex items-center justify-between">
+                      <div class="truncate mr-2">
+                        <span class="font-bold text-slate-900 block truncate">${i+1}. ${client.fullName || 'Cliente'}</span>
+                        <span class="text-[11px] text-slate-500 block truncate">${client.address || ''}</span>
+                      </div>
+                      <div class="shrink-0 text-right">
+                        ${isDel ? `<span class="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">Entregado ${time}</span>` : `<span class="text-[10px] font-bold text-slate-500">${del.status}</span>`}
+                        ${del.deliveryProofPhoto ? `
+                          <button onclick="viewDeliveryPhoto('${del.id}')" class="block mt-1 text-[10px] font-bold text-blue-600 hover:underline">
+                            <i class="fa-solid fa-camera"></i> Foto
+                          </button>
+                        ` : ''}
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+
+              <button onclick="promptReopenRoute()" class="w-full py-2 text-xs text-indigo-300 hover:text-white underline">
+                ¿Necesitas continuar la ruta? Reabrir entregas
+              </button>
+
+              <button onclick="logoutDriver()" class="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 active:scale-[0.99] text-white rounded-xl text-xs font-bold border border-slate-700 transition">
+                Cerrar Sesión
+              </button>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      // 3. Si el conductor aún NO ha iniciado su ruta hoy:
+      if (!effectiveShift || !effectiveShift.startedAt) {
+        if (barFinish) barFinish.classList.add('hidden');
+        if (filterBar) filterBar.classList.add('hidden');
+        if (routeTools) routeTools.classList.add('hidden');
+        if (startedBanner) startedBanner.classList.add('hidden');
+
+        const totalStops = myDeliveries.length;
+        const todayFormatted = new Date().toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+        container.innerHTML = `
+          <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 text-center space-y-5">
+            <div class="relative w-24 h-24 mx-auto flex items-center justify-center">
+              <span class="absolute inset-0 rounded-full bg-blue-500/20 animate-ping"></span>
+              <div class="w-20 h-20 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-3xl shadow-lg shadow-blue-500/30">
+                <i class="fa-solid fa-truck-fast"></i>
+              </div>
+            </div>
+
+            <div>
+              <span class="inline-block px-3 py-1 bg-amber-50 text-amber-700 font-bold text-xs rounded-full border border-amber-200 mb-2">
+                <i class="fa-solid fa-clock mr-1"></i> RUTA PENDIENTE POR INICIAR
+              </span>
+              <h2 class="text-xl font-black text-slate-900">¡Hola, ${currentDriverName}!</h2>
+              <p class="text-xs text-slate-500 mt-1 max-w-xs mx-auto leading-relaxed">
+                Antes de salir de la planta a realizar tus entregas, inicia tu ruta para registrar tu hora de salida oficial y comenzar la trazabilidad del día.
+              </p>
+            </div>
+
+            <!-- Resumen Previo -->
+            <div class="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 text-xs grid grid-cols-2 gap-3 text-left">
+              <div>
+                <span class="text-[11px] text-slate-500 block">Paradas asignadas:</span>
+                <span class="font-bold text-base text-blue-600">${totalStops} ${totalStops === 1 ? 'entrega' : 'entregas'}</span>
+              </div>
+              <div>
+                <span class="text-[11px] text-slate-500 block">Empresa:</span>
+                <span class="font-bold text-xs text-slate-800 truncate block">${currentCompanyName || 'Empresa'}</span>
+              </div>
+              <div class="col-span-2 pt-2 border-t border-slate-200">
+                <span class="text-[11px] text-slate-500 block">Fecha de hoy:</span>
+                <span class="font-semibold text-slate-700 capitalize text-xs">${todayFormatted}</span>
+              </div>
+            </div>
+
+            <!-- Botón Grande de INICIAR RUTA -->
+            <div class="pt-1">
+              <button onclick="openStartRouteModal()" class="w-full py-4 px-5 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-700 active:scale-[0.98] text-white font-black text-sm sm:text-base rounded-2xl shadow-xl shadow-blue-600/30 flex items-center justify-center gap-2.5 transition animate-pulse">
+                <i class="fa-solid fa-circle-play text-xl"></i>
+                <span>🚀 INICIAR RUTA DE HOY</span>
+              </button>
+            </div>
+
+            <!-- Acordeón de Previsualización de Entregas -->
+            <div class="space-y-2">
+              <button onclick="togglePreviewStopsAccordion()" class="w-full py-2.5 px-3 bg-slate-100 hover:bg-slate-200 active:scale-[0.99] text-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition">
+                <i class="fa-solid fa-list-ul"></i>
+                <span id="btnPreviewStopsText">Previsualizar lista de paradas (${totalStops})</span>
+              </button>
+
+              <div id="previewStopsList" class="hidden text-left bg-slate-50 rounded-2xl p-3 max-h-64 overflow-y-auto space-y-2 text-xs border border-slate-200">
+                ${myDeliveries.length === 0 ? '<p class="text-center py-4 text-slate-400">Aún no tienes paradas asignadas para hoy.</p>' : myDeliveries.map((del, i) => {
+                  const client = del.client || {};
+                  return `
+                    <div class="p-2 bg-white rounded-xl border border-slate-200 flex items-center justify-between">
+                      <div class="truncate mr-2">
+                        <span class="font-bold text-slate-800 block truncate">${i+1}. ${client.fullName || 'Cliente'}</span>
+                        <span class="text-[11px] text-slate-500 block truncate">${client.address || ''}</span>
+                      </div>
+                      <span class="shrink-0 text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                        ${client.neighborhood || client.city || 'Parada'}
+                      </span>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+
+              <button onclick="logoutDriver()" class="w-full py-2 text-xs text-slate-400 hover:text-slate-600 font-medium">
+                Cerrar sesión de conductor
+              </button>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      // 4. Ruta ACTIVA (ya inició ruta hoy):
+      if (barFinish) barFinish.classList.remove('hidden');
+      if (filterBar) filterBar.classList.remove('hidden');
+      if (routeTools) routeTools.classList.remove('hidden');
+      if (startedBanner && effectiveShift && effectiveShift.startedAt) {
+        startedBanner.classList.remove('hidden');
+        try {
+          const sTime = new Date(effectiveShift.startedAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
+          if (startedTimeEl) startedTimeEl.innerText = sTime;
+        } catch(e) {}
+      }
+
+      if (barFinish) barFinish.classList.remove('hidden');
+      if (filterBar) filterBar.classList.remove('hidden');
+
+      let filtered = myDeliveries;
+
+      if (currentFilter === 'pending') {
+        filtered = myDeliveries.filter(d => d.status === 'pending' || d.status === 'in_transit');
+      } else if (currentFilter === 'delivered') {
+        filtered = myDeliveries.filter(d => d.status === 'delivered');
+      }
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-12 bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <div class="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">
+              <i class="fa-solid fa-clipboard-check"></i>
+            </div>
+            <h3 class="font-bold text-gray-800 text-base">No hay paradas en esta lista</h3>
+            <p class="text-xs text-gray-500 mt-1">El jefe de logística aún no te ha asignado paradas para hoy o ya completaste todas.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = filtered.map((del, index) => {
+        const client = del.client || {};
+        const isDelivered = del.status === 'delivered';
+        const isInTransit = del.status === 'in_transit';
+        const isFailed = del.status === 'failed';
+
+        let badgeHtml = '';
+        if (isDelivered) {
+          const time = del.deliveredAt ? new Date(del.deliveredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+          badgeHtml = `<span class="status-badge-delivered text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-1"><i class="fa-solid fa-check"></i> Entregado ${time}</span>`;
+        } else if (isInTransit) {
+          badgeHtml = `<span class="status-badge-in_transit text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-1"><i class="fa-solid fa-truck-fast"></i> En Camino</span>`;
+        } else if (isFailed) {
+          badgeHtml = `<span class="status-badge-failed text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-1"><i class="fa-solid fa-triangle-exclamation"></i> Novedad</span>`;
+        } else {
+          badgeHtml = `<span class="status-badge-pending text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-1"><i class="fa-solid fa-clock"></i> Pendiente</span>`;
+        }
+
+        const neighborhood = client.neighborhood || client.barrio || del.neighborhood || '';
+        const receiptTime = client.receiptTime || del.receiptTime || client.deliveryTime || '';
+        const fullAddress = [client.address, neighborhood ? 'Barrio ' + neighborhood : '', client.city].filter(Boolean).join(', ');
+
+        return `
+          <div class="bg-white rounded-2xl shadow-sm border ${isDelivered ? 'border-emerald-300 opacity-90' : 'border-gray-200'} p-4 space-y-3 relative overflow-hidden">
+            <!-- Barra superior con número de parada y estado -->
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-2">
+                <span class="w-7 h-7 rounded-lg ${isDelivered ? 'bg-emerald-600 text-white' : 'bg-gray-800 text-white'} flex items-center justify-center font-black text-xs shadow-sm">
+                  #${del.orderIndex || (index + 1)}
+                </span>
+                <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Parada</span>
+              </div>
+              ${badgeHtml}
+            </div>
+
+            <!-- Información del Cliente -->
+            <div>
+              <h2 class="text-base font-bold text-gray-900 leading-tight">${client.fullName || 'Cliente sin nombre'}</h2>
+              ${client.companyName ? `
+                <p class="text-xs text-blue-600 font-semibold flex items-center gap-1 mt-0.5">
+                  <i class="fa-solid fa-building text-[10px]"></i> ${client.companyName}
+                </p>
+              ` : ''}
+              
+              <!-- Badges de Barrio y Horario -->
+              <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
+                ${neighborhood ? `
+                  <div class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-indigo-50 text-indigo-900 border border-indigo-200 text-xs font-bold">
+                    <i class="fa-solid fa-map-pin text-indigo-600"></i>
+                    <span>Barrio: ${neighborhood}</span>
+                  </div>
+                ` : ''}
+                ${receiptTime ? `
+                  <div class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-900 border border-amber-200 text-xs font-bold shadow-xs">
+                    <i class="fa-solid fa-clock text-amber-600"></i>
+                    <span>Horario: ${receiptTime}</span>
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+
+            <!-- Dirección -->
+            <div class="bg-gray-50 p-2.5 rounded-xl border border-gray-100 flex items-start space-x-2.5">
+              <i class="fa-solid fa-location-dot text-red-500 text-base mt-0.5"></i>
+              <div class="text-xs">
+                <p class="font-bold text-gray-800">${client.address || 'Sin dirección'}</p>
+                ${neighborhood ? `<p class="text-indigo-700 font-semibold text-[11px]"><i class="fa-solid fa-map-pin mr-1"></i>${neighborhood}</p>` : ''}
+                ${client.city ? `<p class="text-gray-500">${client.city}</p>` : ''}
+                ${client.notes ? `<p class="text-amber-700 font-medium italic mt-1 bg-amber-50 p-1.5 rounded border border-amber-200/60"><i class="fa-solid fa-info-circle mr-1"></i>${client.notes}</p>` : ''}
+              </div>
+            </div>
+
+            <!-- BOTÓN DESTACADO: ABRIR EN GOOGLE MAPS -->
+            <button onclick="openInGoogleMaps('${encodeURIComponent(fullAddress)}')" class="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-bold py-3 px-4 rounded-xl shadow-md flex items-center justify-center space-x-2 text-sm transition-transform">
+              <i class="fa-solid fa-map-location-dot text-lg"></i>
+              <span>Abrir Ruta en Google Maps</span>
+              <i class="fa-solid fa-arrow-up-right-from-square text-xs opacity-70 ml-1"></i>
+            </button>
+
+            <!-- Acciones de Teléfono & WhatsApp -->
+            ${client.phone ? `
+              <div class="grid grid-cols-2 gap-2 pt-1">
+                <a href="tel:${client.phone.replace(/[^0-9+]/g, '')}" class="flex items-center justify-center space-x-2 bg-blue-50 text-blue-700 font-semibold py-2 px-3 rounded-xl border border-blue-200 text-xs active:bg-blue-100">
+                  <i class="fa-solid fa-phone"></i>
+                  <span>Llamar</span>
+                </a>
+                <a href="https://wa.me/${client.phone.replace(/[^0-9]/g, '')}?text=Hola%20${encodeURIComponent(client.fullName || '')},%20voy%20en%20camino%20con%20tu%20entrega" target="_blank" class="flex items-center justify-center space-x-2 bg-emerald-50 text-emerald-700 font-semibold py-2 px-3 rounded-xl border border-emerald-200 text-xs active:bg-emerald-100">
+                  <i class="fa-brands fa-whatsapp text-sm text-emerald-600"></i>
+                  <span>WhatsApp</span>
+                </a>
+              </div>
+            ` : ''}
+
+            <!-- Botones de Gestión de Estado -->
+            <div class="border-t border-gray-100 pt-2.5 flex items-center gap-2">
+              ${!isDelivered ? `
+                <button onclick="markStatus('${del.id}', 'in_transit')" class="flex-1 py-2 text-xs font-bold rounded-xl ${isInTransit ? 'bg-blue-100 text-blue-700 border border-blue-300' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">
+                  <i class="fa-solid fa-truck-fast mr-1"></i> En camino
+                </button>
+                <button onclick="openDeliveryConfirmModal('${del.id}')" class="flex-[2] py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-md active:scale-95 flex items-center justify-center gap-1.5 transition">
+                  <i class="fa-solid fa-camera text-xs"></i>
+                  <span>ENTREGADO</span>
+                </button>
+                <button onclick="openNovedadModal('${del.id}')" class="p-2 text-xs font-bold rounded-xl bg-red-50 text-red-600 hover:bg-red-100" title="Reportar novedad">
+                  <i class="fa-solid fa-circle-exclamation text-base"></i>
+                </button>
+              ` : `
+                <div class="w-full flex items-center justify-between text-xs text-emerald-700 bg-emerald-50 p-2.5 rounded-xl border border-emerald-200">
+                  <div class="flex items-center gap-1.5">
+                    <span class="font-bold flex items-center gap-1">
+                      <i class="fa-solid fa-circle-check text-emerald-600 text-sm"></i> Entregado
+                    </span>
+                    ${del.deliveryProofPhoto ? `
+                      <button onclick="viewDeliveryPhoto('${del.id}')" class="ml-1 inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 px-2 py-0.5 rounded-lg border border-emerald-300">
+                        <i class="fa-solid fa-camera text-[10px]"></i> Ver Foto
+                      </button>
+                    ` : ''}
+                  </div>
+                  <button onclick="markStatus('${del.id}', 'pending')" class="text-gray-400 hover:text-gray-600 text-[11px] underline">Deshacer</button>
+                </div>
+              `}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function openInGoogleMaps(encodedAddress) {
+      const destination = decodeURIComponent(encodedAddress);
+      const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}&travelmode=driving`;
+      window.open(mapsUrl, '_blank');
+    }
+
+    async function markStatus(deliveryId, status) {
+      try {
+        await window.FirebaseService.updateDeliveryStatus(deliveryId, status);
+      } catch (err) {
+        alert('Error al actualizar estado: ' + err.message);
+      }
+    }
+
+    // ==================== CONFIRMACIÓN DE ENTREGA CON FOTO ====================
+    let selectedDeliveryForConfirm = null;
+    let currentCapturedPhotoData = null;
+
+    function openDeliveryConfirmModal(deliveryId) {
+      selectedDeliveryForConfirm = deliveryId;
+      currentCapturedPhotoData = null;
+
+      const del = myDeliveries.find(d => d.id === deliveryId);
+      const client = del ? (del.client || {}) : {};
+
+      const nameEl = document.getElementById('confirmDeliveryClientName');
+      const addrEl = document.getElementById('confirmDeliveryAddress');
+      const notesEl = document.getElementById('confirmDeliveryNotes');
+      const camInput = document.getElementById('deliveryCameraInput');
+
+      if (nameEl) nameEl.innerText = client.fullName || 'Cliente';
+      if (addrEl) addrEl.innerText = client.address || 'Dirección de entrega';
+      if (notesEl) notesEl.value = '';
+      if (camInput) camInput.value = '';
+
+      removeCapturedPhoto();
+      document.getElementById('modalConfirmDelivery').classList.remove('hidden');
+    }
+
+    function closeDeliveryConfirmModal() {
+      selectedDeliveryForConfirm = null;
+      currentCapturedPhotoData = null;
+      document.getElementById('modalConfirmDelivery').classList.add('hidden');
+    }
+
+    async function handleDeliveryPhotoCaptured(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+
+      const btnSubmit = document.getElementById('btnSubmitDeliveryConfirm');
+      const btnText = document.getElementById('btnSubmitDeliveryConfirmText');
+
+      if (btnSubmit) btnSubmit.disabled = true;
+      if (btnText) btnText.innerText = 'Procesando foto...';
+
+      try {
+        // Comprimir foto en alta velocidad para que sea liviana (<90KB) y nítida
+        const compressedBase64 = await window.FirebaseService.compressImageFile(file, 1024, 1024, 0.75);
+        currentCapturedPhotoData = compressedBase64;
+
+        const imgPreview = document.getElementById('imgDeliveryPreview');
+        if (imgPreview) imgPreview.src = compressedBase64;
+
+        document.getElementById('boxTakeDeliveryPhoto').classList.add('hidden');
+        document.getElementById('boxDeliveryPhotoPreview').classList.remove('hidden');
+      } catch (err) {
+        alert('Error al procesar la foto: ' + err.message);
+      } finally {
+        if (btnSubmit) btnSubmit.disabled = false;
+        if (btnText) btnText.innerText = 'CONFIRMAR ENTREGA';
+      }
+    }
+
+    function removeCapturedPhoto() {
+      currentCapturedPhotoData = null;
+      const camInput = document.getElementById('deliveryCameraInput');
+      if (camInput) camInput.value = '';
+
+      const imgPreview = document.getElementById('imgDeliveryPreview');
+      if (imgPreview) imgPreview.src = '';
+
+      document.getElementById('boxTakeDeliveryPhoto').classList.remove('hidden');
+      document.getElementById('boxDeliveryPhotoPreview').classList.add('hidden');
+    }
+
+    async function submitDeliveryConfirmation() {
+      if (!selectedDeliveryForConfirm) return;
+      const notes = document.getElementById('confirmDeliveryNotes')?.value?.trim() || '';
+      const btn = document.getElementById('btnSubmitDeliveryConfirm');
+      const btnText = document.getElementById('btnSubmitDeliveryConfirmText');
+
+      if (btn) btn.disabled = true;
+      if (btnText) btnText.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Guardando...';
+
+      try {
+        await window.FirebaseService.updateDeliveryStatus(
+          selectedDeliveryForConfirm,
+          'delivered',
+          notes,
+          null,
+          currentCapturedPhotoData
+        );
+        closeDeliveryConfirmModal();
+      } catch (err) {
+        alert('Error al registrar entrega: ' + err.message);
+      } finally {
+        if (btn) btn.disabled = false;
+        if (btnText) btnText.innerText = 'CONFIRMAR ENTREGA';
+      }
+    }
+
+    function viewDeliveryPhoto(deliveryId) {
+      const del = myDeliveries.find(d => d.id === deliveryId);
+      if (!del || !del.deliveryProofPhoto) return;
+
+      const client = del.client || {};
+      const img = document.getElementById('imgViewDeliveryFull');
+      const nameEl = document.getElementById('viewPhotoClientName');
+      const dateEl = document.getElementById('viewPhotoDateTime');
+      const notesContainer = document.getElementById('viewPhotoNotesContainer');
+      const notesEl = document.getElementById('viewPhotoNotes');
+
+      if (img) img.src = del.deliveryProofPhoto;
+      if (nameEl) nameEl.innerText = `${client.fullName || 'Cliente'} (${client.address || ''})`;
+
+      let dateFormatted = '-';
+      if (del.deliveredAt) {
+        try {
+          dateFormatted = new Date(del.deliveredAt).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' });
+        } catch (e) {
+          dateFormatted = del.deliveredAt;
+        }
+      }
+      if (dateEl) dateEl.innerText = dateFormatted;
+
+      if (del.notes) {
+        if (notesEl) notesEl.innerText = del.notes;
+        if (notesContainer) notesContainer.classList.remove('hidden');
+      } else {
+        if (notesContainer) notesContainer.classList.add('hidden');
+      }
+
+      document.getElementById('modalViewDeliveryPhoto').classList.remove('hidden');
+    }
+
+    function closeViewDeliveryPhotoModal() {
+      document.getElementById('modalViewDeliveryPhoto').classList.add('hidden');
+    }
+
+    // ==================== UTILIDAD DE DURACIÓN ====================
+    function formatDurationBetween(startIso, endIso) {
+      if (!startIso || !endIso) return '-';
+      try {
+        const s = new Date(startIso).getTime();
+        const e = new Date(endIso).getTime();
+        if (isNaN(s) || isNaN(e) || e < s) return '-';
+        const diffMin = Math.round((e - s) / 60000);
+        if (diffMin < 1) return 'Menos de 1 min';
+        if (diffMin < 60) return `${diffMin} min`;
+        const h = Math.floor(diffMin / 60);
+        const m = diffMin % 60;
+        return m > 0 ? `${h} h ${m} min` : `${h} h`;
+      } catch(e) {
+        return '-';
+      }
+    }
+
+    // ==================== INICIO DE RUTA / SALIDA DE PLANTA ====================
+    function promptStartNewDay() {
+      if (!confirm('¿Deseas iniciar una nueva jornada laboral / nueva ruta para hoy?')) return;
+      openStartRouteModal();
+    }
+
+    function openStartRouteModal() {
+      const now = new Date();
+      const currentStr = now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
+      const timeEl = document.getElementById('startModalCurrentTime');
+      const countEl = document.getElementById('startModalStopsCount');
+      const nameEl = document.getElementById('startModalDriverName');
+      const notesEl = document.getElementById('startRouteNotes');
+
+      if (timeEl) timeEl.innerText = currentStr;
+      if (countEl) countEl.innerText = `${myDeliveries.length} paradas`;
+      if (nameEl) nameEl.innerText = currentDriverName || 'Conductor';
+      if (notesEl) notesEl.value = '';
+
+      document.getElementById('modalStartRoute').classList.remove('hidden');
+    }
+
+    function closeStartRouteModal() {
+      document.getElementById('modalStartRoute').classList.add('hidden');
+    }
+
+    async function submitStartRoute() {
+      if (!currentCompanyId || !currentDriverId) return;
+      const today = (window.FirebaseService && typeof window.FirebaseService.getOperationalDate === 'function')
+        ? window.FirebaseService.getOperationalDate()
+        : new Date().toISOString().split('T')[0];
+      const notes = document.getElementById('startRouteNotes')?.value?.trim() || '';
+
+      const btn = document.getElementById('btnSubmitStartRoute');
+      const btnText = document.getElementById('btnSubmitStartRouteText');
+
+      if (btn) btn.disabled = true;
+      if (btnText) btnText.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Iniciando ruta...';
+
+      try {
+        await window.FirebaseService.startDriverRoute(currentCompanyId, currentDriverId, currentDriverName, today, notes);
+        closeStartRouteModal();
+      } catch (err) {
+        alert('Error al iniciar la ruta: ' + err.message);
+      } finally {
+        if (btn) btn.disabled = false;
+        if (btnText) btnText.innerText = 'SÍ, INICIAR RUTA AHORA';
+      }
+    }
+
+    function togglePreviewStopsAccordion() {
+      const list = document.getElementById('previewStopsList');
+      const text = document.getElementById('btnPreviewStopsText');
+      if (!list) return;
+      if (list.classList.contains('hidden')) {
+        list.classList.remove('hidden');
+        if (text) text.innerText = 'Ocultar previsualización';
+      } else {
+        list.classList.add('hidden');
+        if (text) text.innerText = `Previsualizar lista de paradas (${myDeliveries.length})`;
+      }
+    }
+
+    // ==================== FINALIZAR DÍA / RETORNO A PLANTA ====================
+    function openFinishDayModal() {
+      const delivered = myDeliveries.filter(d => d.status === 'delivered').length;
+      const pending = myDeliveries.filter(d => d.status === 'pending' || d.status === 'in_transit').length;
+      const failed = myDeliveries.filter(d => d.status === 'failed').length;
+
+      const delEl = document.getElementById('finishSummaryDelivered');
+      const penEl = document.getElementById('finishSummaryPending');
+      const failEl = document.getElementById('finishSummaryFailed');
+      const warnEl = document.getElementById('finishPendingWarning');
+      const notesEl = document.getElementById('finishShiftNotes');
+
+      if (delEl) delEl.innerText = delivered;
+      if (penEl) penEl.innerText = pending;
+      if (failEl) failEl.innerText = failed;
+      if (notesEl) notesEl.value = '';
+
+      if (warnEl) {
+        if (pending > 0) warnEl.classList.remove('hidden');
+        else warnEl.classList.add('hidden');
+      }
+
+      document.getElementById('modalFinishDay').classList.remove('hidden');
+    }
+
+    function closeFinishDayModal() {
+      document.getElementById('modalFinishDay').classList.add('hidden');
+    }
+
+    async function submitFinishDay() {
+      if (!currentCompanyId || !currentDriverId) return;
+      const today = (window.FirebaseService && typeof window.FirebaseService.getOperationalDate === 'function')
+        ? window.FirebaseService.getOperationalDate()
+        : new Date().toISOString().split('T')[0];
+      const notes = document.getElementById('finishShiftNotes')?.value?.trim() || '';
+
+      const btn = document.getElementById('btnSubmitFinishDay');
+      const btnText = document.getElementById('btnSubmitFinishDayText');
+
+      if (btn) btn.disabled = true;
+      if (btnText) btnText.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Cerrando jornada...';
+
+      try {
+        await window.FirebaseService.finishDriverDay(currentCompanyId, currentDriverId, currentDriverName, today, notes);
+        closeFinishDayModal();
+      } catch (err) {
+        alert('Error al finalizar la jornada: ' + err.message);
+      } finally {
+        if (btn) btn.disabled = false;
+        if (btnText) btnText.innerText = 'CONFIRMAR Y RETORNAR A PLANTA';
+      }
+    }
+
+    async function promptReopenRoute() {
+      if (!confirm('¿Deseas reanudar tu ruta y reactivar la lista de entregas de hoy?')) return;
+      const today = (window.FirebaseService && typeof window.FirebaseService.getOperationalDate === 'function')
+        ? window.FirebaseService.getOperationalDate()
+        : new Date().toISOString().split('T')[0];
+      try {
+        await window.FirebaseService.reopenDriverDay(currentCompanyId, currentDriverId, today);
+      } catch (err) {
+        alert('Error al reabrir ruta: ' + err.message);
+      }
+    }
+
+    // ==================== CONFIRMAR LLEGADA A PLANTA / CIERRE TOTAL ====================
+    function openArrivalPlantModal() {
+      const startTime = currentDriverShift?.startedAt;
+      const finishTime = currentDriverShift?.finishedAt;
+      let startStr = '-';
+      let finishStr = '-';
+      if (startTime) {
+        try {
+          startStr = new Date(startTime).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
+        } catch(e) {}
+      }
+      if (finishTime) {
+        try {
+          finishStr = new Date(finishTime).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
+        } catch(e) {}
+      }
+      const now = new Date();
+      const currentStr = now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+      let durationStr = 'Calculando...';
+      if (finishTime) {
+        const diffMin = Math.max(0, Math.round((now.getTime() - new Date(finishTime).getTime()) / 60000));
+        if (diffMin < 1) durationStr = 'Menos de 1 min';
+        else if (diffMin < 60) durationStr = `${diffMin} min de viaje`;
+        else {
+          const h = Math.floor(diffMin / 60);
+          const m = diffMin % 60;
+          durationStr = `${h} h ${m} min de viaje`;
+        }
+      }
+
+      let totalWorkdayStr = '-';
+      if (startTime) {
+        const totalMin = Math.max(0, Math.round((now.getTime() - new Date(startTime).getTime()) / 60000));
+        if (totalMin < 1) totalWorkdayStr = 'Menos de 1 min';
+        else if (totalMin < 60) totalWorkdayStr = `${totalMin} min`;
+        else {
+          const h = Math.floor(totalMin / 60);
+          const m = totalMin % 60;
+          totalWorkdayStr = `${h} h ${m} min`;
+        }
+      }
+
+      const startEl = document.getElementById('arrivalModalRouteStartTime');
+      const endEl = document.getElementById('arrivalModalRouteEndTime');
+      const nowEl = document.getElementById('arrivalModalCurrentTime');
+      const durEl = document.getElementById('arrivalModalDuration');
+      const workdayEl = document.getElementById('arrivalModalTotalWorkday');
+      const notesEl = document.getElementById('arrivalPlantNotes');
+
+      if (startEl) startEl.innerText = startStr;
+      if (endEl) endEl.innerText = finishStr;
+      if (nowEl) nowEl.innerText = currentStr;
+      if (durEl) durEl.innerText = durationStr;
+      if (workdayEl) workdayEl.innerText = totalWorkdayStr;
+      if (notesEl) notesEl.value = '';
+
+      document.getElementById('modalConfirmArrivalPlant').classList.remove('hidden');
+    }
+
+    function closeArrivalPlantModal() {
+      document.getElementById('modalConfirmArrivalPlant').classList.add('hidden');
+    }
+
+    async function submitArrivalAtPlant() {
+      if (!currentCompanyId || !currentDriverId) return;
+      const today = (window.FirebaseService && typeof window.FirebaseService.getOperationalDate === 'function')
+        ? window.FirebaseService.getOperationalDate()
+        : new Date().toISOString().split('T')[0];
+      const notes = document.getElementById('arrivalPlantNotes')?.value?.trim() || '';
+
+      const btn = document.getElementById('btnSubmitArrivalPlant');
+      const btnText = document.getElementById('btnSubmitArrivalPlantText');
+
+      if (btn) btn.disabled = true;
+      if (btnText) btnText.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Registrando llegada...';
+
+      try {
+        await window.FirebaseService.confirmArrivalAtPlant(currentCompanyId, currentDriverId, today, notes);
+        closeArrivalPlantModal();
+      } catch (err) {
+        alert('Error al registrar llegada a planta: ' + err.message);
+      } finally {
+        if (btn) btn.disabled = false;
+        if (btnText) btnText.innerText = 'CONFIRMAR LLEGADA Y CERRAR DÍA';
+      }
+    }
+
+    function toggleCompletedSummaryAccordion() {
+      const list = document.getElementById('completedSummaryList');
+      const text = document.getElementById('btnSummaryAccordionText');
+      if (!list) return;
+      if (list.classList.contains('hidden')) {
+        list.classList.remove('hidden');
+        if (text) text.innerText = 'Ocultar entregas de hoy';
+      } else {
+        list.classList.add('hidden');
+        const delCount = myDeliveries.filter(d => d.status === 'delivered').length;
+        if (text) text.innerText = `Ver entregas realizadas hoy (${delCount})`;
+      }
+    }
+
+    function openNovedadModal(deliveryId) {
+      selectedDeliveryForNovedad = deliveryId;
+      document.getElementById('novedadModal').classList.remove('hidden');
+    }
+
+    function closeNovedadModal() {
+      selectedDeliveryForNovedad = null;
+      document.getElementById('novedadModal').classList.add('hidden');
+    }
+
+    async function submitNovedad() {
+      if (!selectedDeliveryForNovedad) return;
+      const reason = document.getElementById('novedadReason').value;
+      const notes = document.getElementById('novedadNotes').value;
+
+      try {
+        await window.FirebaseService.updateDeliveryStatus(
+          selectedDeliveryForNovedad,
+          'failed',
+          notes ? `${reason} - ${notes}` : reason,
+          reason
+        );
+        closeNovedadModal();
+      } catch (err) {
+        alert('Error al reportar novedad: ' + err.message);
+      }
+    }
+
+    // ==================== RUTAS INTELIGENTES & GOOGLE MAPS ====================
+    async function conductorSortBySchedule(e) {
+      if (!myDeliveries || myDeliveries.length <= 1) {
+        alert('Se requieren al menos 2 paradas para ordenar la ruta.');
+        return;
+      }
+      const btn = e?.currentTarget;
+      if (btn) {
+        btn.classList.add('opacity-50');
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-amber-300 text-sm"></i><span>Ordenando...</span>`;
+      }
+      try {
+        await window.FirebaseService.sortDeliveriesBySchedule(myDeliveries);
+      } catch (err) {
+        alert('Error al ordenar por horario: ' + err.message);
+      } finally {
+        if (btn) {
+          btn.classList.remove('opacity-50');
+          btn.innerHTML = `<i class="fa-solid fa-clock text-amber-300 text-sm"></i><span>Por Horario</span>`;
+        }
+      }
+    }
+
+    async function conductorSortByNeighborhood(e) {
+      if (!myDeliveries || myDeliveries.length <= 1) {
+        alert('Se requieren al menos 2 paradas para organizar la ruta.');
+        return;
+      }
+      const btn = e?.currentTarget;
+      if (btn) {
+        btn.classList.add('opacity-50');
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-indigo-300 text-sm"></i><span>Agrupando...</span>`;
+      }
+      try {
+        await window.FirebaseService.sortDeliveriesByNeighborhood(myDeliveries);
+      } catch (err) {
+        alert('Error al ordenar por barrio: ' + err.message);
+      } finally {
+        if (btn) {
+          btn.classList.remove('opacity-50');
+          btn.innerHTML = `<i class="fa-solid fa-map-pin text-indigo-300 text-sm"></i><span>Por Barrio</span>`;
+        }
+      }
+    }
+
+    async function conductorOptimizeByProximity(e) {
+      if (!myDeliveries || myDeliveries.length <= 1) {
+        alert('Se requieren al menos 2 paradas para optimizar la ruta.');
+        return;
+      }
+      const btn = e?.currentTarget;
+      if (btn) {
+        btn.classList.add('opacity-50');
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-teal-300 text-sm"></i><span>Optimizando...</span>`;
+      }
+
+      let startCoords = null;
+      if (navigator.geolocation) {
+        try {
+          const pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, { timeout: 4000 }));
+          startCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        } catch {}
+      }
+
+      try {
+        await window.FirebaseService.optimizeDeliveriesByProximity(myDeliveries, startCoords);
+      } catch (err) {
+        alert('Error al optimizar por cercanía: ' + err.message);
+      } finally {
+        if (btn) {
+          btn.classList.remove('opacity-50');
+          btn.innerHTML = `<i class="fa-solid fa-route text-teal-300 text-sm"></i><span>Más Cercanos</span>`;
+        }
+      }
+    }
+
+    function conductorOpenFullMaps() {
+      if (!myDeliveries || myDeliveries.length === 0) {
+        alert('No hay paradas en la ruta para mostrar en Google Maps.');
+        return;
+      }
+      const activeStops = myDeliveries.filter(d => d.status !== 'delivered');
+      const targetStops = activeStops.length > 0 ? activeStops : myDeliveries;
+
+      const addresses = targetStops.map(d => {
+        const c = d.client || {};
+        const hood = c.neighborhood || c.barrio || d.neighborhood || '';
+        return [c.address, hood ? 'Barrio ' + hood : '', c.city].filter(Boolean).join(', ').trim();
+      }).filter(Boolean);
+
+      if (addresses.length === 0) {
+        alert('Ninguna de las paradas tiene dirección registrada.');
+        return;
+      }
+
+      if (addresses.length === 1) {
+        window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addresses[0])}&travelmode=driving`, '_blank');
+        return;
+      }
+
+      const origin = encodeURIComponent(addresses[0]);
+      const destination = encodeURIComponent(addresses[addresses.length - 1]);
+      const waypoints = addresses.slice(1, -1).map(encodeURIComponent).join('|');
+      const mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&waypoints=${waypoints}&travelmode=driving`;
+      window.open(mapsUrl, '_blank');
+    }
+  </script>
+</body>
+</html>

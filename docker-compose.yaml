@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: enrutador-mongodb
+    restart: always
+    environment:
+      MONGO_INITDB_DATABASE: enrutador
+    volumes:
+      - mongo_data:/data/db
+    ports:
+      - "127.0.0.1:27017:27017"
+    networks:
+      - enrutador-net
+
+  app:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    container_name: enrutador-app
+    restart: always
+    depends_on:
+      - mongodb
+    environment:
+      PORT: 3000
+      MONGODB_URI: mongodb://mongodb:27017/enrutador
+      DB_NAME: enrutador
+      MASTER_EMAIL: dcasesorias@gmail.com
+      DEFAULT_MASTER_PASS: admin12345
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    networks:
+      - enrutador-net
+
+volumes:
+  mongo_data:
+    driver: local
+
+networks:
+  enrutador-net:
+    driver: bridge
