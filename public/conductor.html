@@ -69,9 +69,9 @@
   <!-- SPLASH SCREEN DE APERTURA MÓVIL (FLOTA REAL + LOGO DC) -->
   <!-- ======================================================== -->
   <div id="mobileAppSplash" class="fixed inset-0 z-[9999] flex flex-col justify-between items-center text-white bg-[#031414] transition-opacity duration-700 pointer-events-auto">
-    <!-- Imagen de Fondo de Flota Logística Completa -->
-    <img src="/icons/splash-mobile.jpg?v=1" alt="DC Enrutador" class="absolute inset-0 w-full h-full object-cover object-center pointer-events-none">
-    <div class="absolute inset-0 bg-gradient-to-t from-[#031414] via-[#062222]/40 to-[#031414]/75 pointer-events-none"></div>
+    <!-- Imagen de Fondo de Flota Logística Limpia (Sin logos incrustados) -->
+    <img src="/icons/splash-mobile.jpg?v=5" alt="DC Enrutador" class="absolute inset-0 w-full h-full object-cover object-center pointer-events-none">
+    <div class="absolute inset-0 bg-gradient-to-t from-[#031414] via-[#062222]/35 to-[#031414]/70 pointer-events-none"></div>
 
     <!-- Indicador superior -->
     <div class="relative z-10 pt-10 text-center">
@@ -80,17 +80,18 @@
       </span>
     </div>
 
-    <!-- Centro: Logo y Título -->
-    <div class="relative z-10 text-center space-y-3.5 px-6 w-full max-w-xs my-auto">
-      <div class="w-28 h-28 mx-auto rounded-full bg-slate-950/80 border-2 border-teal-400 shadow-2xl backdrop-blur-md flex items-center justify-center p-1 overflow-hidden">
-        <img src="/icons/logo.jpg?v=15" alt="Logo" class="w-full h-full object-cover rounded-full">
+    <!-- Centro: Único Logo Oficial DC Enrutador y Barra de Inicio -->
+    <div class="relative z-10 text-center space-y-3 px-6 w-full max-w-xs my-auto">
+      <!-- Logo Oficial Circular (Único, limpio y nítido) -->
+      <div class="w-24 h-24 sm:w-28 sm:h-28 mx-auto rounded-full bg-slate-950/90 border-2 border-teal-400 shadow-2xl backdrop-blur-md flex items-center justify-center p-1 overflow-hidden">
+        <img src="/icons/logo.jpg?v=20" alt="DC Enrutador" class="w-full h-full object-cover rounded-full">
       </div>
       <div>
-        <h2 class="text-2xl font-black text-white tracking-tight drop-shadow-lg">DC ENRUTADOR</h2>
+        <h2 class="text-xl sm:text-2xl font-black text-white tracking-tight drop-shadow-lg">DC ENRUTADOR</h2>
         <p class="text-xs text-teal-200 font-medium drop-shadow mt-0.5">Control y Enrutamiento Logístico</p>
       </div>
       <!-- Barra de progreso de inicio -->
-      <div class="w-full bg-slate-900/70 rounded-full h-1.5 overflow-hidden border border-teal-500/30 backdrop-blur-sm">
+      <div class="w-full bg-slate-900/80 rounded-full h-1.5 overflow-hidden border border-teal-500/30 backdrop-blur-sm shadow-lg">
         <div class="bg-gradient-to-r from-teal-400 via-emerald-400 to-teal-300 h-full rounded-full animate-pulse" style="width: 100%"></div>
       </div>
     </div>
@@ -117,7 +118,7 @@
   <header class="sticky top-0 z-40 bg-blue-600 text-white shadow-md px-4 py-3">
     <div class="flex items-center justify-between">
       <div class="flex items-center space-x-2.5">
-        <img src="/icons/logo.jpg?v=12" alt="Logo" class="w-11 h-11 rounded-full object-cover shadow border border-white/30">
+        <img src="/icons/logo.jpg?v=16" alt="Logo" class="w-11 h-11 rounded-full object-cover shadow border border-white/30">
         <div>
           <h1 class="text-lg font-bold leading-none flex items-center gap-1.5">
             Mi Ruta del Día
