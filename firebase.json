@@ -1,6 +1,5 @@
 {
   "hosting": {
-    "site": "enrutador-col",
     "public": "public",
     "ignore": [
       "firebase.json",

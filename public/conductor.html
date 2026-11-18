@@ -65,6 +65,54 @@
 </head>
 <body class="bg-gray-100 text-gray-800 font-sans pb-24">
 
+  <!-- ======================================================== -->
+  <!-- SPLASH SCREEN DE APERTURA MÓVIL (FLOTA REAL + LOGO DC) -->
+  <!-- ======================================================== -->
+  <div id="mobileAppSplash" class="fixed inset-0 z-[9999] flex flex-col justify-between items-center text-white bg-[#031414] transition-opacity duration-700 pointer-events-auto">
+    <!-- Imagen de Fondo de Flota Logística Completa -->
+    <img src="/icons/splash-mobile.jpg?v=1" alt="DC Enrutador" class="absolute inset-0 w-full h-full object-cover object-center pointer-events-none">
+    <div class="absolute inset-0 bg-gradient-to-t from-[#031414] via-[#062222]/40 to-[#031414]/75 pointer-events-none"></div>
+
+    <!-- Indicador superior -->
+    <div class="relative z-10 pt-10 text-center">
+      <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-950/70 border border-teal-500/30 text-teal-300 text-[11px] font-bold tracking-widest uppercase backdrop-blur-md shadow-lg">
+        <span class="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></span> Ecosistema DC Asesorías
+      </span>
+    </div>
+
+    <!-- Centro: Logo y Título -->
+    <div class="relative z-10 text-center space-y-3.5 px-6 w-full max-w-xs my-auto">
+      <div class="w-28 h-28 mx-auto rounded-full bg-slate-950/80 border-2 border-teal-400 shadow-2xl backdrop-blur-md flex items-center justify-center p-1 overflow-hidden">
+        <img src="/icons/logo.jpg?v=15" alt="Logo" class="w-full h-full object-cover rounded-full">
+      </div>
+      <div>
+        <h2 class="text-2xl font-black text-white tracking-tight drop-shadow-lg">DC ENRUTADOR</h2>
+        <p class="text-xs text-teal-200 font-medium drop-shadow mt-0.5">Control y Enrutamiento Logístico</p>
+      </div>
+      <!-- Barra de progreso de inicio -->
+      <div class="w-full bg-slate-900/70 rounded-full h-1.5 overflow-hidden border border-teal-500/30 backdrop-blur-sm">
+        <div class="bg-gradient-to-r from-teal-400 via-emerald-400 to-teal-300 h-full rounded-full animate-pulse" style="width: 100%"></div>
+      </div>
+    </div>
+
+    <!-- Pie inferior -->
+    <div class="relative z-10 pb-6 text-center text-[10px] text-teal-300/80 font-mono">
+      Sistema Integral de Enrutamiento • v1.0
+    </div>
+  </div>
+  <script>
+    // Desvanecer el Splash Screen suavemente cuando la app termine de cargar
+    window.addEventListener('DOMContentLoaded', function() {
+      setTimeout(function() {
+        var splash = document.getElementById('mobileAppSplash');
+        if (splash) {
+          splash.classList.add('opacity-0', 'pointer-events-none');
+          setTimeout(function() { splash.remove(); }, 750);
+        }
+      }, 1600);
+    });
+  </script>
+
   <!-- Cabecera Móvil -->
   <header class="sticky top-0 z-40 bg-blue-600 text-white shadow-md px-4 py-3">
     <div class="flex items-center justify-between">

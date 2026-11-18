@@ -4,8 +4,8 @@
   "description": "Sistema Integral de Enrutamiento y Navegación GPS - DC Asesorías",
   "start_url": "/conductor.html",
   "display": "standalone",
-  "background_color": "#101c32",
-  "theme_color": "#101c32",
+  "background_color": "#031414",
+  "theme_color": "#031414",
   "orientation": "portrait",
   "icons": [
     {
