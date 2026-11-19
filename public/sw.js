@@ -1,5 +1,5 @@
 // Service Worker para soporte PWA y funcionamiento ágil en celulares
-const CACHE_NAME = 'enrutador-pwa-v11';
+const CACHE_NAME = 'enrutador-pwa-v12';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
