@@ -2,32 +2,33 @@
   "name": "DC Enrutador",
   "short_name": "DC Enrutador",
   "description": "Sistema Integral de Enrutamiento y Navegación GPS - DC Asesorías",
-  "start_url": "/conductor.html",
+  "id": "/conductor.html?v=3",
+  "start_url": "/conductor.html?source=pwa_v3",
   "display": "standalone",
   "background_color": "#031414",
   "theme_color": "#031414",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "/icons/icon-192.png",
+      "src": "/icons/icon-pwa-round-192.png?v=3",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icons/icon-512.png",
+      "src": "/icons/icon-pwa-round-512.png?v=3",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icons/icon-maskable-192.png",
+      "src": "/icons/icon-pwa-maskable-192.png?v=3",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "/icons/icon-maskable-512.png",
+      "src": "/icons/icon-pwa-maskable-512.png?v=3",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
